@@ -1,0 +1,21 @@
+# Só formatação e lint (P10); os testes rodam no CI.
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.17.2
+    hooks:
+      - id: ruff-check
+        args: [--fix]
+      - id: ruff-format
+  - repo: local
+    hooks:
+      - id: prettier
+        name: prettier (web)
+        entry: node web/scripts/pre-commit.mjs prettier
+        language: system
+        files: ^web/
+        exclude: ^web/package-lock\.json$
+      - id: eslint
+        name: eslint (web)
+        entry: node web/scripts/pre-commit.mjs eslint
+        language: system
+        files: ^web/.*\.(ts|tsx)$

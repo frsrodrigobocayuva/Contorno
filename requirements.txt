@@ -1,0 +1,2 @@
+# Dependências da aplicação, com versão fixa (==).
+# Cada biblioteca entra junto do código que a usa (plano do MVP, S4-05 e S4-06).
