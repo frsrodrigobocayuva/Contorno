@@ -66,3 +66,19 @@ def test_rota_restrita_com_custom_model_aceita_area_proibida() -> None:
     )
 
     assert resposta.status_code == 200, resposta.text
+
+
+def test_rota_restrita_usa_lm() -> None:
+    """ADR-014: a rota restrita usa LM e visita menos nós que o modo flexível puro."""
+    corpo: dict[str, object] = {
+        "profile": "car",
+        "points": [UNISINOS, CENTRO_NOVO_HAMBURGO],
+        "ch.disable": True,
+        "custom_model": {"priority": [{"if": "road_class == RESIDENTIAL", "multiply_by": "0.5"}]},
+    }
+
+    com_lm = rota(corpo).json()
+    sem_lm = rota({**corpo, "lm.disable": True}).json()
+
+    assert com_lm["paths"][0]["distance"] == sem_lm["paths"][0]["distance"]
+    assert com_lm["hints"]["visited_nodes.sum"] < sem_lm["hints"]["visited_nodes.sum"]

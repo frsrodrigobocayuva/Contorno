@@ -64,9 +64,26 @@ def baixar_bruto(data: str) -> tuple[Path, str]:
     return destino, md5_esperado
 
 
-def osmium(*args: str) -> str:
-    comando = ["docker", "run", "--rm", "-v", f"{DADOS}:/dados", IMAGEM_OSMIUM, *args]
-    return subprocess.run(comando, check=True, capture_output=True, text=True).stdout.strip()
+def osmium(*args: str, copiar_para_dentro: str | None = None) -> str:
+    """Roda o osmium no contêiner, com motor/dados montado em /dados.
+
+    No Docker Desktop (Windows), o osmium não consegue ler arquivos grandes direto da pasta
+    montada ("Read failed: Cannot allocate memory"); com copiar_para_dentro, o arquivo é
+    copiado para o disco do contêiner e o comando o lê como /tmp/fonte.osm.pbf.
+    """
+    if copiar_para_dentro:
+        script = f'cp "{copiar_para_dentro}" /tmp/fonte.osm.pbf && osmium "$@"'
+        comando = ["--entrypoint", "sh", IMAGEM_OSMIUM, "-c", script, "osmium", *args]
+    else:
+        comando = [IMAGEM_OSMIUM, *args]
+    resultado = subprocess.run(
+        ["docker", "run", "--rm", "-v", f"{DADOS}:/dados", *comando],
+        capture_output=True,
+        text=True,
+    )
+    if resultado.returncode != 0:
+        raise SystemExit(f"osmium falhou: {resultado.stderr.strip()}")
+    return resultado.stdout.strip()
 
 
 def main() -> None:
@@ -99,7 +116,8 @@ def main() -> None:
         "--overwrite",
         "-o",
         RECORTE,
-        origem,
+        "/tmp/fonte.osm.pbf",
+        copiar_para_dentro=origem,
     )
     carimbo = osmium("fileinfo", "-g", "header.option.osmosis_replication_timestamp", origem)
 

@@ -1,0 +1,21 @@
+{
+  "fonte": "https://download.geofabrik.de/south-america/brazil/sul-261025.osm.pbf",
+  "md5_fonte": "90d8ba43bbe199de5a0f457a9be4e15f",
+  "carimbo_osm": "2026-10-25T21:21:21Z",
+  "retangulo": {
+    "min_lon": -51.2100287,
+    "min_lat": -29.8302389,
+    "max_lon": -50.9341246,
+    "max_lat": -29.6377057,
+    "municipios": {
+      "Sao Leopoldo": "relation/242399",
+      "Novo Hamburgo": "relation/242616"
+    }
+  },
+  "recorte": "recorte-sl-nh.osm.pbf",
+  "sha256": "03c4b95f1b61dcfeb6c0d88e1fea42374995de1e4bc5d4fb26d3afaaa819dbd8",
+  "bytes": 1943343,
+  "estrategia": "osmium extract --strategy complete_ways",
+  "gerado_em": "2026-10-26",
+  "licenca": "ODbL — © OpenStreetMap contributors"
+}

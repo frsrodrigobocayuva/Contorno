@@ -28,7 +28,7 @@ cp .env.example .env    # preencha o contato em NOMINATIM_USER_AGENT
 docker compose up --build
 ```
 
-Abra http://localhost:8000. A primeira subida importa o grafo do GraphHopper e prepara as acelerações CH e LM, o que leva alguns minutos; as seguintes reaproveitam o volume `graph-cache`. `http://localhost:8000/health` responde `200` quando a API e o motor estão no ar.
+Abra http://localhost:8000. A primeira subida importa o grafo do GraphHopper e prepara as acelerações CH e LM (cerca de 20 s no recorte atual); as seguintes reaproveitam o volume `graph-cache`. `http://localhost:8000/health` responde `200` quando a API e o motor estão no ar.
 
 Só a porta 8000 é publicada. O GraphHopper fica na rede interna do compose.
 
