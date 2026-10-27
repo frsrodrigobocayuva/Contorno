@@ -1,0 +1,46 @@
+# Ajustes do ambiente só para o CI, aplicados sobre o compose.yaml:
+#   COMPOSE_FILE=compose.yaml:compose.ci.yaml  e  GRAPH_CACHE_DIR=<pasta do grafo no runner>
+# - o grafo fica numa pasta do runner, que o cache do GitHub Actions consegue guardar;
+# - os falsos da OSM respondem no lugar do Nominatim e dos tiles (plano, A5);
+# - os hosts públicos da OSM apontam para lugar nenhum (mesma lista de .github/scripts/bloquear-osm.sh).
+
+x-sem-osm: &sem-osm
+  - "nominatim.openstreetmap.org=0.0.0.0"
+  - "nominatim.openstreetmap.org=::"
+  - "tile.openstreetmap.org=0.0.0.0"
+  - "tile.openstreetmap.org=::"
+  - "a.tile.openstreetmap.org=0.0.0.0"
+  - "a.tile.openstreetmap.org=::"
+  - "b.tile.openstreetmap.org=0.0.0.0"
+  - "b.tile.openstreetmap.org=::"
+  - "c.tile.openstreetmap.org=0.0.0.0"
+  - "c.tile.openstreetmap.org=::"
+
+services:
+  graphhopper:
+    volumes:
+      - ${GRAPH_CACHE_DIR:?defina GRAPH_CACHE_DIR}:/graph-cache
+
+  api:
+    environment:
+      NOMINATIM_URL: http://falsos:8080
+    extra_hosts: *sem-osm
+    depends_on:
+      falsos:
+        condition: service_started
+
+  dev:
+    environment:
+      NOMINATIM_URL: http://falsos:8080
+      FALSOS_URL: http://falsos:8080
+    extra_hosts: *sem-osm
+    depends_on:
+      falsos:
+        condition: service_started
+
+  falsos:
+    build:
+      context: .
+      target: dev
+    command: ["python", "tests/falsos/servidor.py", "8080"]
+    networks: [contorno-net]

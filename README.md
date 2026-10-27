@@ -44,17 +44,41 @@ py -3.13 -m venv .venv
 cd web && npm ci && npm run dev    # chamadas à API vão para localhost:8000
 ```
 
-Verificações:
+Verificações (o `pytest` roda com a rede bloqueada; só os testes de contrato podem abrir conexão):
 
 ```bash
 ruff check . && ruff format --check . && mypy && pytest
-cd web && npm run lint && npm run typecheck && npm test && npm run build
+cd web && npm run format:check && npm run lint && npm run typecheck && npm test && npm run build
 ```
 
 Testes de contrato contra o GraphHopper real, dentro da rede do compose:
 
 ```bash
-docker compose run --rm dev pytest tests/contrato
+docker compose run --rm dev pytest tests/contrato --no-cov
+```
+
+Tipos do contrato da API: quando a API mudar, gere de novo o OpenAPI e os tipos TypeScript, e versione os dois (`web/src/api/openapi.json` e `web/src/api/schema.ts`):
+
+```bash
+python -m app.api.exportar_openapi web/src/api/openapi.json
+cd web && npm run generate:api-types
+```
+
+## Integração contínua
+
+O GitHub Actions (`.github/workflows/ci.yml`) roda a cada PR para a `main` e a cada push na `main`. Os quatro checks são obrigatórios para o merge:
+
+| Check | O que verifica |
+|---|---|
+| `python` | Ruff, mypy, testes sem rede e cobertura mínima de 90% em domínio e aplicação |
+| `web` | Prettier, ESLint, TypeScript, Vitest e build |
+| `openapi` | se os tipos versionados do contrato estão atualizados |
+| `integracao` | sobe o compose com o GraphHopper e roda os testes de contrato |
+
+O CI nunca chama os serviços públicos da OSM: os hosts do Nominatim e dos tiles ficam bloqueados, e o serviço `falsos` (`compose.ci.yaml`) responde com as buscas gravadas em `tests/falsos/nominatim/` e um tile em branco. Para regravar as buscas (decisão explícita; usa o `NOMINATIM_USER_AGENT` do `.env`):
+
+```bash
+python tests/falsos/gravar_nominatim.py
 ```
 
 ## Dados do mapa
@@ -74,7 +98,7 @@ Os dados são © OpenStreetMap contributors, sob a licença ODbL.
 app/        servidor, uma pasta por camada (api, aplicacao, dominio, infra)
 web/        cliente React
 motor/      GraphHopper: Dockerfile, config.yml e recorte do extrato
-tests/      dominio, aplicacao, contrato, arquitetura
+tests/      dominio, aplicacao, contrato, arquitetura; falsos da OSM para o CI
 ```
 
 ## Contribuição

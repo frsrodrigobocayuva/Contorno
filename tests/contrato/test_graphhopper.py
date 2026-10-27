@@ -10,9 +10,10 @@ import pytest
 
 GRAPHHOPPER_URL = os.environ.get("GRAPHHOPPER_URL", "")
 
-pytestmark = pytest.mark.skipif(
-    not GRAPHHOPPER_URL, reason="GraphHopper do compose não configurado"
-)
+pytestmark = [
+    pytest.mark.skipif(not GRAPHHOPPER_URL, reason="GraphHopper do compose não configurado"),
+    pytest.mark.enable_socket,
+]
 
 # [longitude, latitude], consultados no Nominatim em 2026-10-26
 UNISINOS = [-51.1549545, -29.7954567]

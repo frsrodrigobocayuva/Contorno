@@ -1,0 +1,107 @@
+[
+  {
+    "place_id": 7876025,
+    "licence": "Data © OpenStreetMap contributors, ODbL 1.0. http://osm.org/copyright",
+    "osm_type": "way",
+    "osm_id": 1281158544,
+    "lat": "-29.7631927",
+    "lon": "-51.1464448",
+    "category": "highway",
+    "type": "tertiary",
+    "place_rank": 26,
+    "importance": 0.05339422064545659,
+    "addresstype": "tertiary",
+    "name": "Rua Independência",
+    "display_name": "Rua Independência, Centro, São Leopoldo, Rio Grande do Sul, Região Sul, 93010-001, Brasil",
+    "boundingbox": [
+      "-29.7658303",
+      "-29.7605600",
+      "-51.1470853",
+      "-51.1458273"
+    ]
+  },
+  {
+    "place_id": 7881711,
+    "licence": "Data © OpenStreetMap contributors, ODbL 1.0. http://osm.org/copyright",
+    "osm_type": "way",
+    "osm_id": 56154455,
+    "lat": "-29.7683645",
+    "lon": "-51.1451933",
+    "category": "highway",
+    "type": "tertiary",
+    "place_rank": 26,
+    "importance": 0.05339422064545659,
+    "addresstype": "tertiary",
+    "name": "Rua Independência",
+    "display_name": "Rua Independência, Centro, São Leopoldo, Rio Grande do Sul, Região Sul, 93010-200, Brasil",
+    "boundingbox": [
+      "-29.7709129",
+      "-29.7658303",
+      "-51.1458273",
+      "-51.1446183"
+    ]
+  },
+  {
+    "place_id": 7882253,
+    "licence": "Data © OpenStreetMap contributors, ODbL 1.0. http://osm.org/copyright",
+    "osm_type": "way",
+    "osm_id": 87646759,
+    "lat": "-29.7721330",
+    "lon": "-51.1442323",
+    "category": "highway",
+    "type": "tertiary",
+    "place_rank": 26,
+    "importance": 0.05339422064545659,
+    "addresstype": "tertiary",
+    "name": "Rua Independência",
+    "display_name": "Rua Independência, Centro, São Leopoldo, Rio Grande do Sul, Região Sul, 93020-690, Brasil",
+    "boundingbox": [
+      "-29.7732480",
+      "-29.7709978",
+      "-51.1444607",
+      "-51.1439189"
+    ]
+  },
+  {
+    "place_id": 7878830,
+    "licence": "Data © OpenStreetMap contributors, ODbL 1.0. http://osm.org/copyright",
+    "osm_type": "way",
+    "osm_id": 92612668,
+    "lat": "-29.7709711",
+    "lon": "-51.1446106",
+    "category": "highway",
+    "type": "tertiary",
+    "place_rank": 26,
+    "importance": 0.05339422064545659,
+    "addresstype": "tertiary",
+    "name": "Rua Independência",
+    "display_name": "Rua Independência, Centro, São Leopoldo, Rio Grande do Sul, Região Sul, 93010-004, Brasil",
+    "boundingbox": [
+      "-29.7710293",
+      "-29.7709129",
+      "-51.1446183",
+      "-51.1446029"
+    ]
+  },
+  {
+    "place_id": 7889678,
+    "licence": "Data © OpenStreetMap contributors, ODbL 1.0. http://osm.org/copyright",
+    "osm_type": "way",
+    "osm_id": 157187732,
+    "lat": "-29.7601074",
+    "lon": "-51.1471997",
+    "category": "highway",
+    "type": "service",
+    "place_rank": 27,
+    "importance": 0.04006088731212328,
+    "addresstype": "road",
+    "name": "Rua Independência",
+    "display_name": "Rua Independência, Centro, São Leopoldo, Rio Grande do Sul, Região Sul, 93010-000, Brasil",
+    "boundingbox": [
+      "-29.7605600",
+      "-29.7596549",
+      "-51.1473140",
+      "-51.1470853"
+    ]
+  }
+]

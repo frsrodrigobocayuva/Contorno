@@ -1,2 +1,5 @@
 dist
 package-lock.json
+# Gerados a partir do OpenAPI da API (npm run generate:api-types)
+src/api/openapi.json
+src/api/schema.ts

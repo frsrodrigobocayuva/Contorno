@@ -1,0 +1,17 @@
+{
+  "fonte": "https://nominatim.openstreetmap.org/search",
+  "gravado_em": "2026-10-27",
+  "parametros": {
+    "format": "jsonv2",
+    "viewbox": "-51.2100287,-29.8302389,-50.9341246,-29.6377057",
+    "bounded": "1",
+    "countrycodes": "br",
+    "limit": "5"
+  },
+  "consultas": {
+    "UNISINOS": "unisinos.json",
+    "Rua Independência, São Leopoldo": "rua-independencia-sao-leopoldo.json",
+    "Avenida Pedro Adams Filho, Novo Hamburgo": "avenida-pedro-adams-filho-novo-hamburgo.json",
+    "Aeroporto Internacional Salgado Filho": "aeroporto-internacional-salgado-filho.json"
+  }
+}

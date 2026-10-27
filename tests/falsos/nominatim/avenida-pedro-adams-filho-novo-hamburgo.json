@@ -1,0 +1,107 @@
+[
+  {
+    "place_id": 7845162,
+    "licence": "Data © OpenStreetMap contributors, ODbL 1.0. http://osm.org/copyright",
+    "osm_type": "way",
+    "osm_id": 95152996,
+    "lat": "-29.7183505",
+    "lon": "-51.1288612",
+    "category": "highway",
+    "type": "secondary",
+    "place_rank": 26,
+    "importance": 0.05339430914778359,
+    "addresstype": "secondary",
+    "name": "Avenida Pedro Adams Filho",
+    "display_name": "Avenida Pedro Adams Filho, Santo Afonso, Novo Hamburgo, Rio Grande do Sul, Região Sul, 93320-001, Brasil",
+    "boundingbox": [
+      "-29.7226394",
+      "-29.7123341",
+      "-51.1331285",
+      "-51.1287571"
+    ]
+  },
+  {
+    "place_id": 7838437,
+    "licence": "Data © OpenStreetMap contributors, ODbL 1.0. http://osm.org/copyright",
+    "osm_type": "way",
+    "osm_id": 908211338,
+    "lat": "-29.7002035",
+    "lon": "-51.1319100",
+    "category": "highway",
+    "type": "secondary",
+    "place_rank": 26,
+    "importance": 0.05339430914778359,
+    "addresstype": "secondary",
+    "name": "Avenida Pedro Adams Filho",
+    "display_name": "Avenida Pedro Adams Filho, Pátria Nova, Novo Hamburgo, Rio Grande do Sul, Região Sul, 93410-038, Brasil",
+    "boundingbox": [
+      "-29.7028745",
+      "-29.6977370",
+      "-51.1325059",
+      "-51.1307633"
+    ]
+  },
+  {
+    "place_id": 7870964,
+    "licence": "Data © OpenStreetMap contributors, ODbL 1.0. http://osm.org/copyright",
+    "osm_type": "way",
+    "osm_id": 105992568,
+    "lat": "-29.7269176",
+    "lon": "-51.1379131",
+    "category": "highway",
+    "type": "secondary",
+    "place_rank": 26,
+    "importance": 0.05339430914778359,
+    "addresstype": "secondary",
+    "name": "Avenida Pedro Adams Filho",
+    "display_name": "Avenida Pedro Adams Filho, Santo Afonso, Novo Hamburgo, Rio Grande do Sul, Região Sul, 93330-010, Brasil",
+    "boundingbox": [
+      "-29.7280752",
+      "-29.7257922",
+      "-51.1392579",
+      "-51.1365411"
+    ]
+  },
+  {
+    "place_id": 7816037,
+    "licence": "Data © OpenStreetMap contributors, ODbL 1.0. http://osm.org/copyright",
+    "osm_type": "way",
+    "osm_id": 102754068,
+    "lat": "-29.7249941",
+    "lon": "-51.1358142",
+    "category": "highway",
+    "type": "secondary",
+    "place_rank": 26,
+    "importance": 0.05339430914778359,
+    "addresstype": "secondary",
+    "name": "Avenida Pedro Adams Filho",
+    "display_name": "Avenida Pedro Adams Filho, Santo Afonso, Novo Hamburgo, Rio Grande do Sul, Região Sul, 93330-370, Brasil",
+    "boundingbox": [
+      "-29.7257076",
+      "-29.7242379",
+      "-51.1366364",
+      "-51.1350510"
+    ]
+  },
+  {
+    "place_id": 7848572,
+    "licence": "Data © OpenStreetMap contributors, ODbL 1.0. http://osm.org/copyright",
+    "osm_type": "way",
+    "osm_id": 103373877,
+    "lat": "-29.7236442",
+    "lon": "-51.1341789",
+    "category": "highway",
+    "type": "secondary",
+    "place_rank": 26,
+    "importance": 0.05339430914778359,
+    "addresstype": "secondary",
+    "name": "Avenida Pedro Adams Filho",
+    "display_name": "Avenida Pedro Adams Filho, Industrial, Novo Hamburgo, Rio Grande do Sul, Região Sul, 93320-001, Brasil",
+    "boundingbox": [
+      "-29.7239986",
+      "-29.7230833",
+      "-51.1348346",
+      "-51.1336747"
+    ]
+  }
+]
