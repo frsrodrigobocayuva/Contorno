@@ -1,8 +1,12 @@
 # Ferramentas de desenvolvimento, com versão fixa (==).
 -r requirements.txt
+h3==4.5.0
 mypy==2.4.0
+osmium==4.3.2
 pre-commit==4.7.0
+pyproj==3.8.0
 pytest==9.1.1
 pytest-cov==7.1.0
 pytest-socket==0.8.1
 ruff==0.17.2
+shapely==2.1.2

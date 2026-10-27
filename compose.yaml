@@ -38,6 +38,9 @@ services:
     build:
       context: .
       target: dev
+    # Scripts de medição e extrato, lidos direto da cópia de trabalho (sem rebuild).
+    volumes:
+      - ./motor:/srv/motor:ro
     environment:
       GRAPHHOPPER_URL: http://graphhopper:8989
     depends_on:
