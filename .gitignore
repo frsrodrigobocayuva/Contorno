@@ -216,3 +216,6 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Extrato bruto da Geofabrik (centenas de MB); só o recorte é versionado
+motor/dados/brutos/
