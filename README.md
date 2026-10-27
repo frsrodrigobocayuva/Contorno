@@ -64,6 +64,19 @@ python -m app.api.exportar_openapi web/src/api/openapi.json
 cd web && npm run generate:api-types
 ```
 
+## Medições
+
+Os scripts das medições do DAS 8 ficam em `motor/medicoes/` e rodam no serviço `dev`, dentro da rede do GraphHopper (compose no ar):
+
+```bash
+docker compose run --rm dev python motor/medicoes/resolucao.py     # [1] resolução H3 (A1)
+docker compose run --rm dev python motor/medicoes/vias.py          # [2] classes de via e surface (D13)
+docker compose run --rm dev python motor/medicoes/fatores.py       # [3] fatores de via (A3)
+docker compose run --rm dev python motor/medicoes/diagnostico.py   # [5] diagnóstico (A2)
+```
+
+Os resultados ficam registrados no ADR-010 e no DAS 8, na wiki do projeto.
+
 ## Integração contínua
 
 O GitHub Actions (`.github/workflows/ci.yml`) roda a cada PR para a `main` e a cada push na `main`. Os quatro checks são obrigatórios para o merge:

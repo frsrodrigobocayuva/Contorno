@@ -18,6 +18,10 @@ COPY app/ app/
 
 # 3. Ferramentas: testes de contrato e medições, dentro da rede do compose
 FROM base AS dev
+# libexpat1: exigida pelo osmium, que lê o extrato nas medições.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libexpat1 \
+    && rm -rf /var/lib/apt/lists/*
 COPY requirements-dev.txt pyproject.toml ./
 RUN pip install --no-cache-dir -r requirements-dev.txt
 COPY tests/ tests/
