@@ -1,0 +1,65 @@
+[
+  {
+    "place_id": 7950665,
+    "licence": "Data © OpenStreetMap contributors, ODbL 1.0. http://osm.org/copyright",
+    "osm_type": "relation",
+    "osm_id": 7257901,
+    "lat": "-29.7954567",
+    "lon": "-51.1549545",
+    "category": "amenity",
+    "type": "university",
+    "place_rank": 30,
+    "importance": 0.4419798675817451,
+    "addresstype": "amenity",
+    "name": "Universidade do Vale do Rio dos Sinos",
+    "display_name": "Universidade do Vale do Rio dos Sinos, Rua Alfredo Varela, São João Batista, São Leopoldo, Rio Grande do Sul, Região Sul, 93022-422, Brasil",
+    "boundingbox": [
+      "-29.7998986",
+      "-29.7911033",
+      "-51.1609341",
+      "-51.1457522"
+    ]
+  },
+  {
+    "place_id": 7904639,
+    "licence": "Data © OpenStreetMap contributors, ODbL 1.0. http://osm.org/copyright",
+    "osm_type": "node",
+    "osm_id": 5317023241,
+    "lat": "-29.7869137",
+    "lon": "-51.1405047",
+    "category": "railway",
+    "type": "station",
+    "place_rank": 30,
+    "importance": 0.20813244289121335,
+    "addresstype": "railway",
+    "name": "Unisinos",
+    "display_name": "Unisinos, 3539, Avenida Mauá, Morro do Espelho, São Leopoldo, Rio Grande do Sul, Região Sul, 93020-770, Brasil",
+    "boundingbox": [
+      "-29.7919137",
+      "-29.7819137",
+      "-51.1455047",
+      "-51.1355047"
+    ]
+  },
+  {
+    "place_id": 7870868,
+    "licence": "Data © OpenStreetMap contributors, ODbL 1.0. http://osm.org/copyright",
+    "osm_type": "node",
+    "osm_id": 418137243,
+    "lat": "-29.7868986",
+    "lon": "-51.1404596",
+    "category": "railway",
+    "type": "stop",
+    "place_rank": 30,
+    "importance": 6.088731212324739e-05,
+    "addresstype": "railway",
+    "name": "Unisinos",
+    "display_name": "Unisinos, Avenida Mauá, Morro do Espelho, São Leopoldo, Rio Grande do Sul, Região Sul, 93030-092, Brasil",
+    "boundingbox": [
+      "-29.7869486",
+      "-29.7868486",
+      "-51.1405096",
+      "-51.1404096"
+    ]
+  }
+]

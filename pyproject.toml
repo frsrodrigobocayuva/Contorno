@@ -28,7 +28,9 @@ extra_checks = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "--cov --cov-report=term-missing"
+# Testes sem rede (P6): toda conexão falha, exceto nos módulos marcados com enable_socket
+# (os de contrato, que falam com o compose).
+addopts = "--cov --cov-report=term-missing --disable-socket"
 
 # Cobertura mínima de 90% medida só em domínio e aplicação.
 [tool.coverage.run]

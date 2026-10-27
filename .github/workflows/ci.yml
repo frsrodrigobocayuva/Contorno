@@ -1,0 +1,131 @@
+# Integração contínua (plano, P6): a cada PR para a main e a cada push na main.
+# O push na main guarda o cache do grafo onde todos os PRs conseguem ler.
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  python:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Bloquear os serviços públicos da OSM
+        run: bash .github/scripts/bloquear-osm.sh
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.13.18"
+          cache: pip
+          cache-dependency-path: requirements*.txt
+      - run: pip install -r requirements-dev.txt
+      - name: Ruff (formatação)
+        run: ruff format --check .
+      - name: Ruff (lint)
+        run: ruff check .
+      - name: mypy
+        run: mypy
+      - name: Testes sem rede e cobertura
+        run: pytest
+
+  web:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Bloquear os serviços públicos da OSM
+        run: bash .github/scripts/bloquear-osm.sh
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24.22.1"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+        working-directory: web
+      - name: Prettier
+        run: npm run format:check
+        working-directory: web
+      - name: ESLint
+        run: npm run lint
+        working-directory: web
+      - name: TypeScript
+        run: npm run typecheck
+        working-directory: web
+      - name: Vitest
+        run: npm test
+        working-directory: web
+      - name: Build
+        run: npm run build
+        working-directory: web
+
+  openapi:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Bloquear os serviços públicos da OSM
+        run: bash .github/scripts/bloquear-osm.sh
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.13.18"
+          cache: pip
+          cache-dependency-path: requirements.txt
+      - run: pip install -r requirements.txt
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24.22.1"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+        working-directory: web
+      - name: Gerar o OpenAPI e os tipos TypeScript
+        run: |
+          python -m app.api.exportar_openapi web/src/api/openapi.json
+          (cd web && npm run generate:api-types)
+      - name: Conferir se os tipos versionados estão atualizados
+        run: |
+          if [ -n "$(git status --porcelain -- web/src/api)" ]; then
+            git status --short -- web/src/api
+            git diff -- web/src/api
+            echo "::error::Tipos do OpenAPI desatualizados: rode 'python -m app.api.exportar_openapi web/src/api/openapi.json' e, em web/, 'npm run generate:api-types'."
+            exit 1
+          fi
+
+  integracao:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      COMPOSE_FILE: compose.yaml:compose.ci.yaml
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Bloquear os serviços públicos da OSM
+        run: bash .github/scripts/bloquear-osm.sh
+      - name: Pasta do grafo no runner
+        run: |
+          mkdir -p "$RUNNER_TEMP/graph-cache"
+          echo "GRAPH_CACHE_DIR=$RUNNER_TEMP/graph-cache" >> "$GITHUB_ENV"
+      - name: Cache do grafo (extrato, versão do GraphHopper e config)
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/graph-cache
+          # A versão do GraphHopper é o GRAPHHOPPER_VERSION do Dockerfile do motor.
+          key: grafo-${{ hashFiles('motor/dados/recorte-sl-nh.osm.pbf', 'motor/config.yml', 'motor/graphhopper.Dockerfile') }}
+      - name: Subir api, graphhopper e falsos
+        run: docker compose up -d --wait
+      - name: /health
+        run: curl -fsS http://localhost:8000/health
+      - name: Testes de contrato e dos falsos
+        run: docker compose run --rm dev pytest tests/contrato tests/falsos --no-cov
+      - name: Logs do compose
+        if: failure()
+        run: docker compose logs
