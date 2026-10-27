@@ -5,6 +5,111 @@
     "version": "0.1.0"
   },
   "paths": {
+    "/rotas/calculo": {
+      "post": {
+        "summary": "Calcular",
+        "description": "A rota irrestrita entre origem e destino; sem caminho, o diagnóstico (D6).",
+        "operationId": "calcular_rotas_calculo_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PedidoDeRota"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/RespostaRotas"
+                    },
+                    {
+                      "$ref": "#/components/schemas/RespostaDiagnostico"
+                    }
+                  ],
+                  "title": "Response Calcular Rotas Calculo Post",
+                  "discriminator": {
+                    "propertyName": "tipo",
+                    "mapping": {
+                      "ROTAS": "#/components/schemas/RespostaRotas",
+                      "DIAGNOSTICO": "#/components/schemas/RespostaDiagnostico"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/enderecos": {
+      "get": {
+        "summary": "Buscar",
+        "description": "Até 5 lugares no recorte; sem resultado ou com o serviço fora do ar, lista vazia e motivo.",
+        "operationId": "buscar_enderecos_get",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 200,
+              "title": "Q"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RespostaEnderecos"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        }
+      }
+    },
     "/health": {
       "get": {
         "summary": "Health",
@@ -20,6 +125,303 @@
             }
           }
         }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "CausaDeInviabilidade": {
+        "type": "string",
+        "enum": [
+          "DESTINO_INALCANCAVEL",
+          "RESTRICAO_UNICA",
+          "COMBINACAO_DE_RESTRICOES"
+        ],
+        "title": "CausaDeInviabilidade"
+      },
+      "Erro": {
+        "properties": {
+          "codigo": {
+            "type": "string",
+            "title": "Codigo"
+          },
+          "mensagem": {
+            "type": "string",
+            "title": "Mensagem"
+          },
+          "detalhes": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detalhes"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "codigo",
+          "mensagem"
+        ],
+        "title": "Erro",
+        "description": "Formato único de erro (DAS 6.9)."
+      },
+      "LinhaGeoJSON": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "LineString",
+            "title": "Type",
+            "default": "LineString"
+          },
+          "coordinates": {
+            "items": {
+              "prefixItems": [
+                {
+                  "type": "number",
+                  "maximum": 180.0,
+                  "minimum": -180.0
+                },
+                {
+                  "type": "number",
+                  "maximum": 90.0,
+                  "minimum": -90.0
+                }
+              ],
+              "type": "array",
+              "maxItems": 2,
+              "minItems": 2
+            },
+            "type": "array",
+            "title": "Coordinates"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "coordinates"
+        ],
+        "title": "LinhaGeoJSON"
+      },
+      "LugarDTO": {
+        "properties": {
+          "nome": {
+            "type": "string",
+            "title": "Nome"
+          },
+          "coordenada": {
+            "prefixItems": [
+              {
+                "type": "number",
+                "maximum": 180.0,
+                "minimum": -180.0
+              },
+              {
+                "type": "number",
+                "maximum": 90.0,
+                "minimum": -90.0
+              }
+            ],
+            "type": "array",
+            "maxItems": 2,
+            "minItems": 2,
+            "title": "Coordenada"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "nome",
+          "coordenada"
+        ],
+        "title": "LugarDTO"
+      },
+      "MotivoDeBuscaVazia": {
+        "type": "string",
+        "enum": [
+          "SEM_RESULTADO",
+          "SERVICO_INDISPONIVEL"
+        ],
+        "title": "MotivoDeBuscaVazia"
+      },
+      "PedidoDeRota": {
+        "properties": {
+          "origem": {
+            "prefixItems": [
+              {
+                "type": "number",
+                "maximum": 180.0,
+                "minimum": -180.0
+              },
+              {
+                "type": "number",
+                "maximum": 90.0,
+                "minimum": -90.0
+              }
+            ],
+            "type": "array",
+            "maxItems": 2,
+            "minItems": 2,
+            "title": "Origem"
+          },
+          "destino": {
+            "prefixItems": [
+              {
+                "type": "number",
+                "maximum": 180.0,
+                "minimum": -180.0
+              },
+              {
+                "type": "number",
+                "maximum": 90.0,
+                "minimum": -90.0
+              }
+            ],
+            "type": "array",
+            "maxItems": 2,
+            "minItems": 2,
+            "title": "Destino"
+          },
+          "restricoes": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "maxItems": 0,
+            "title": "Restricoes",
+            "description": "Áreas e preferências de via; entram na Sprint 5, por ora só lista vazia."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "origem",
+          "destino"
+        ],
+        "title": "PedidoDeRota"
+      },
+      "RespostaDiagnostico": {
+        "properties": {
+          "tipo": {
+            "type": "string",
+            "const": "DIAGNOSTICO",
+            "title": "Tipo",
+            "default": "DIAGNOSTICO"
+          },
+          "causa": {
+            "$ref": "#/components/schemas/CausaDeInviabilidade"
+          },
+          "candidatas": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Candidatas"
+          },
+          "mensagem": {
+            "type": "string",
+            "title": "Mensagem"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "causa",
+          "candidatas",
+          "mensagem"
+        ],
+        "title": "RespostaDiagnostico",
+        "description": "Inviabilidade: 200 com um objeto só de diagnóstico (plano, D6)."
+      },
+      "RespostaEnderecos": {
+        "properties": {
+          "lugares": {
+            "items": {
+              "$ref": "#/components/schemas/LugarDTO"
+            },
+            "type": "array",
+            "title": "Lugares"
+          },
+          "motivo": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MotivoDeBuscaVazia"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "lugares"
+        ],
+        "title": "RespostaEnderecos"
+      },
+      "RespostaRotas": {
+        "properties": {
+          "tipo": {
+            "type": "string",
+            "const": "ROTAS",
+            "title": "Tipo",
+            "default": "ROTAS"
+          },
+          "irrestrita": {
+            "$ref": "#/components/schemas/RotaDTO"
+          },
+          "restrita": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RotaDTO"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "irrestrita"
+        ],
+        "title": "RespostaRotas"
+      },
+      "RotaDTO": {
+        "properties": {
+          "geometria": {
+            "$ref": "#/components/schemas/LinhaGeoJSON"
+          },
+          "duracaoSegundos": {
+            "type": "number",
+            "title": "Duracaosegundos"
+          },
+          "distanciaMetros": {
+            "type": "number",
+            "title": "Distanciametros"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "geometria",
+          "duracaoSegundos",
+          "distanciaMetros"
+        ],
+        "title": "RotaDTO"
       }
     }
   }

@@ -2,4 +2,5 @@
 # Cada biblioteca entra junto do código que a usa (plano do MVP, S4-05 e S4-06).
 fastapi==0.162.0
 httpx==0.28.1
+pydantic==2.14.1
 uvicorn==0.54.0

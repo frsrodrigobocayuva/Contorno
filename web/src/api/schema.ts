@@ -4,6 +4,46 @@
  */
 
 export interface paths {
+    "/rotas/calculo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Calcular
+         * @description A rota irrestrita entre origem e destino; sem caminho, o diagnóstico (D6).
+         */
+        post: operations["calcular_rotas_calculo_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/enderecos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Buscar
+         * @description Até 5 lugares no recorte; sem resultado ou com o serviço fora do ar, lista vazia e motivo.
+         */
+        get: operations["buscar_enderecos_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/health": {
         parameters: {
             query?: never;
@@ -27,7 +67,116 @@ export interface paths {
 }
 export type webhooks = Record<string, never>;
 export interface components {
-    schemas: never;
+    schemas: {
+        /**
+         * CausaDeInviabilidade
+         * @enum {string}
+         */
+        CausaDeInviabilidade: "DESTINO_INALCANCAVEL" | "RESTRICAO_UNICA" | "COMBINACAO_DE_RESTRICOES";
+        /**
+         * Erro
+         * @description Formato único de erro (DAS 6.9).
+         */
+        Erro: {
+            /** Codigo */
+            codigo: string;
+            /** Mensagem */
+            mensagem: string;
+            /** Detalhes */
+            detalhes?: {
+                [key: string]: string;
+            }[] | null;
+        };
+        /** LinhaGeoJSON */
+        LinhaGeoJSON: {
+            /**
+             * Type
+             * @default LineString
+             * @constant
+             */
+            type: "LineString";
+            /** Coordinates */
+            coordinates: [
+                number,
+                number
+            ][];
+        };
+        /** LugarDTO */
+        LugarDTO: {
+            /** Nome */
+            nome: string;
+            /** Coordenada */
+            coordenada: [
+                number,
+                number
+            ];
+        };
+        /**
+         * MotivoDeBuscaVazia
+         * @enum {string}
+         */
+        MotivoDeBuscaVazia: "SEM_RESULTADO" | "SERVICO_INDISPONIVEL";
+        /** PedidoDeRota */
+        PedidoDeRota: {
+            /** Origem */
+            origem: [
+                number,
+                number
+            ];
+            /** Destino */
+            destino: [
+                number,
+                number
+            ];
+            /**
+             * Restricoes
+             * @description Áreas e preferências de via; entram na Sprint 5, por ora só lista vazia.
+             */
+            restricoes?: {
+                [key: string]: unknown;
+            }[];
+        };
+        /**
+         * RespostaDiagnostico
+         * @description Inviabilidade: 200 com um objeto só de diagnóstico (plano, D6).
+         */
+        RespostaDiagnostico: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            tipo: "DIAGNOSTICO";
+            causa: components["schemas"]["CausaDeInviabilidade"];
+            /** Candidatas */
+            candidatas: string[];
+            /** Mensagem */
+            mensagem: string;
+        };
+        /** RespostaEnderecos */
+        RespostaEnderecos: {
+            /** Lugares */
+            lugares: components["schemas"]["LugarDTO"][];
+            motivo?: components["schemas"]["MotivoDeBuscaVazia"] | null;
+        };
+        /** RespostaRotas */
+        RespostaRotas: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            tipo: "ROTAS";
+            irrestrita: components["schemas"]["RotaDTO"];
+            restrita?: components["schemas"]["RotaDTO"] | null;
+        };
+        /** RotaDTO */
+        RotaDTO: {
+            geometria: components["schemas"]["LinhaGeoJSON"];
+            /** Duracaosegundos */
+            duracaoSegundos: number;
+            /** Distanciametros */
+            distanciaMetros: number;
+        };
+    };
     responses: never;
     parameters: never;
     requestBodies: never;
@@ -36,6 +185,79 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    calcular_rotas_calculo_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PedidoDeRota"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RespostaRotas"] | components["schemas"]["RespostaDiagnostico"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Erro"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Erro"];
+                };
+            };
+        };
+    };
+    buscar_enderecos_get: {
+        parameters: {
+            query: {
+                q: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RespostaEnderecos"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Erro"];
+                };
+            };
+        };
+    };
     health_health_get: {
         parameters: {
             query?: never;

@@ -24,6 +24,8 @@ services:
   api:
     environment:
       NOMINATIM_URL: http://falsos:8080
+      # A API exige um User-Agent com contato; no CI ele só chega aos falsos.
+      NOMINATIM_USER_AGENT: "Contorno/CI (contato: falsos da OSM, sem chamadas reais)"
     extra_hosts: *sem-osm
     depends_on:
       falsos:

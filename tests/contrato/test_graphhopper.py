@@ -8,6 +8,9 @@ import os
 import httpx
 import pytest
 
+from app.dominio.modelo import ConsultaDeRota, Coordenada, OpcoesDeCusto
+from app.infra.graphhopper import AdaptadorGraphHopper
+
 GRAPHHOPPER_URL = os.environ.get("GRAPHHOPPER_URL", "")
 
 pytestmark = [
@@ -83,3 +86,18 @@ def test_rota_restrita_usa_lm() -> None:
 
     assert com_lm["paths"][0]["distance"] == sem_lm["paths"][0]["distance"]
     assert com_lm["hints"]["visited_nodes.sum"] < sem_lm["hints"]["visited_nodes.sum"]
+
+
+@pytest.mark.anyio
+async def test_adaptador_calcula_a_rota_irrestrita_conhecida() -> None:
+    consulta = ConsultaDeRota(Coordenada(*UNISINOS), Coordenada(*CENTRO_NOVO_HAMBURGO))
+
+    async with httpx.AsyncClient() as cliente:
+        rota = await AdaptadorGraphHopper(cliente, GRAPHHOPPER_URL, 10).calcular(
+            consulta, (), OpcoesDeCusto()
+        )
+
+    assert rota is not None
+    assert 5_000 < rota.distancia_metros < 30_000
+    assert rota.duracao_segundos > 0
+    assert rota.geometria[0] != rota.geometria[-1]
