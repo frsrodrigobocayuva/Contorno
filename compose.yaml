@@ -1,0 +1,52 @@
+# Ambiente do Contorno (DAS 7.4): API e GraphHopper numa rede interna; só a porta 8000 é publicada.
+services:
+  graphhopper:
+    build:
+      context: motor
+      dockerfile: graphhopper.Dockerfile
+    volumes:
+      - ./motor/dados:/dados:ro
+      - graph-cache:/graph-cache
+    networks: [contorno-net]
+    healthcheck:
+      test: ["CMD", "curl", "-fs", "http://localhost:8989/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      # A primeira subida importa o grafo e prepara CH e LM.
+      start_period: 600s
+
+  api:
+    build:
+      context: .
+      target: final
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      GRAPHHOPPER_URL: http://graphhopper:8989
+    ports:
+      - "8000:8000"
+    depends_on:
+      graphhopper:
+        condition: service_healthy
+    networks: [contorno-net]
+
+  # Ferramentas (testes de contrato, medições): docker compose run --rm dev <comando>
+  dev:
+    profiles: [ferramentas]
+    build:
+      context: .
+      target: dev
+    environment:
+      GRAPHHOPPER_URL: http://graphhopper:8989
+    depends_on:
+      graphhopper:
+        condition: service_healthy
+    networks: [contorno-net]
+
+volumes:
+  graph-cache:
+
+networks:
+  contorno-net:

@@ -1,0 +1,45 @@
+# Configuração do GraphHopper do Contorno (ADR-009; DAS 6.4).
+# Irrestrita: perfil car com CH. Restrita: custom_model por consulta com ch.disable,
+# acelerada por LM (decisão de 2026-10-26; ADR-014).
+graphhopper:
+  datareader.file: /dados/recorte-sl-nh.osm.pbf
+  graph.location: /graph-cache
+
+  # road_class e surface são lidos pelo custom_model das preferências de via (UC03).
+  graph.encoded_values: car_access, car_average_speed, road_access, road_class, surface
+
+  profiles:
+    - name: car
+      custom_model_files: [car.json]
+
+  profiles_ch:
+    - profile: car
+
+  # LM funciona com custom_model que só encarece vias: área = prioridade 0, via = fator < 1.
+  profiles_lm:
+    - profile: car
+  prepare.lm.landmarks: 16
+
+  prepare.min_network_size: 200
+  import.osm.ignored_highways: footway,cycleway,path,pedestrian,bridleway,steps
+  routing.snap_preventions_default: tunnel, bridge, ferry
+  graph.dataaccess.default_type: RAM_STORE
+
+server:
+  application_connectors:
+    - type: http
+      port: 8989
+      bind_host: 0.0.0.0
+      max_request_header_size: 50k
+  request_log:
+    appenders: []
+  admin_connectors:
+    - type: http
+      port: 8990
+      bind_host: 0.0.0.0
+
+logging:
+  appenders:
+    - type: console
+      time_zone: UTC
+      log_format: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
