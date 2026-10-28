@@ -259,8 +259,8 @@ class Diagnostico:
     """Por que não há rota (UC05), com as áreas candidatas pelo id (plano, D6).
 
     RN07: sempre com causa. Uma combinação envolve pelo menos 2 áreas: com uma só, removê-la
-    deixaria a irrestrita, e sem irrestrita a causa é o destino inalcançável. O texto da mensagem
-    entra na S5-03.
+    deixaria a irrestrita, e sem irrestrita a causa é o destino inalcançável. As mensagens são as
+    do protótipo aprovado (telas 11, 12 e 13).
     """
 
     causa: CausaDeInviabilidade
@@ -276,6 +276,25 @@ class Diagnostico:
             or (self.causa is CausaDeInviabilidade.COMBINACAO_DE_RESTRICOES and quantas < 2)
         ):
             raise ValueError(f"{self.causa} não admite {quantas} candidata(s)")
+
+    def mensagem(self) -> str:
+        return _MENSAGENS[self.causa]
+
+
+_MENSAGENS = {
+    CausaDeInviabilidade.DESTINO_INALCANCAVEL: (
+        "Nem sem nenhuma restrição a malha viária chega ao destino. A causa não são as áreas nem "
+        "as preferências que você declarou."
+    ),
+    CausaDeInviabilidade.RESTRICAO_UNICA: (
+        "Não há rota que respeite todas as áreas. O destino é alcançável sem restrições. Cada uma "
+        "destas áreas, sozinha, bloqueia o trajeto."
+    ),
+    CausaDeInviabilidade.COMBINACAO_DE_RESTRICOES: (
+        "Nenhuma área sozinha bloqueia o trajeto. É a combinação delas: tirar só uma não abre "
+        "caminho."
+    ),
+}
 
 
 @dataclass(frozen=True, slots=True)

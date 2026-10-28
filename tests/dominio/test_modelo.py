@@ -322,3 +322,23 @@ def test_regra_de_custo_valida() -> None:
 def test_regra_de_custo_invalida(chave: str, valores: frozenset[str], fator: float) -> None:
     with pytest.raises(ValueError):
         RegraDeCusto(chave, valores, fator)
+
+
+@pytest.mark.parametrize(
+    "causa, candidatas",
+    [
+        (CausaDeInviabilidade.DESTINO_INALCANCAVEL, ()),
+        (CausaDeInviabilidade.RESTRICAO_UNICA, ("a1",)),
+        (CausaDeInviabilidade.COMBINACAO_DE_RESTRICOES, ("a1", "a2")),
+    ],
+)
+def test_diagnostico_tem_mensagem_para_cada_causa(
+    causa: CausaDeInviabilidade, candidatas: tuple[str, ...]
+) -> None:
+    assert Diagnostico(causa, candidatas).mensagem()
+
+
+def test_destino_inalcancavel_diz_que_a_causa_nao_sao_as_restricoes() -> None:
+    mensagem = Diagnostico(CausaDeInviabilidade.DESTINO_INALCANCAVEL).mensagem()
+
+    assert "não são as áreas nem as preferências" in mensagem

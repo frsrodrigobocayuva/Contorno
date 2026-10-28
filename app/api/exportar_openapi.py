@@ -4,14 +4,10 @@ Uso: python -m app.api.exportar_openapi web/src/api/openapi.json
 """
 
 import json
-import os
 import sys
 from pathlib import Path
 
-# O esquema não depende da configuração; o valor só satisfaz a leitura feita na subida.
-os.environ.setdefault("GRAPHHOPPER_URL", "http://graphhopper:8989")
-
-from app.api.main import app  # noqa: E402
+from app.api.main import app
 
 
 def main() -> None:

@@ -1,9 +1,333 @@
+/* Identidade neutra até a escolha de cor, fonte e logotipo (plano, D19): preto, cinzas e a fonte
+   do sistema, como o protótipo do MVP. */
 :root {
+  --tinta: #1a1a1a;
+  --tinta-suave: #595959;
+  --borda: #cfcfcf;
+  --borda-forte: #9e9e9e;
+  --fundo: #ffffff;
+  --fundo-suave: #f4f4f4;
+  --mapa: #ededed;
   font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
-  color: #111;
-  background: #fff;
+  font-size: 15px;
+  color: var(--tinta);
+  background: var(--fundo);
 }
 
 body {
   margin: 0;
+}
+
+button,
+input {
+  font: inherit;
+  color: inherit;
+}
+
+/* Celular: campos, mapa e painel empilhados (telas 02 e 03). */
+.app {
+  position: relative;
+  height: 100dvh;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(240px, 1fr) auto;
+  grid-template-areas: 'topo' 'campos' 'mapa' 'base';
+}
+
+/* Abertura: só o mapa, o nome e o botão (telas 01 e 14). */
+.app-abertura {
+  grid-template-rows: minmax(0, 1fr);
+  grid-template-areas: 'mapa';
+}
+
+/* Computador: painel lateral e mapa (tela 15). */
+@media (min-width: 900px) {
+  .app:not(.app-abertura) {
+    grid-template-columns: 380px minmax(0, 1fr);
+    grid-template-rows: auto auto minmax(0, 1fr);
+    grid-template-areas: 'topo mapa' 'campos mapa' 'base mapa';
+  }
+  .app:not(.app-abertura) .base {
+    align-self: start;
+    border-top: 0;
+  }
+  .app:not(.app-abertura) .topo,
+  .app:not(.app-abertura) .campos,
+  .app:not(.app-abertura) .base {
+    border-right: 1px solid var(--borda);
+  }
+}
+
+.mapa {
+  grid-area: mapa;
+  min-height: 240px;
+  background: var(--mapa);
+}
+
+.topo {
+  grid-area: topo;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--borda);
+}
+
+.nome {
+  font-weight: 600;
+  font-size: 18px;
+  letter-spacing: 0.02em;
+}
+
+.voltar {
+  min-width: 44px;
+  min-height: 44px;
+  margin-left: -12px;
+  border: 0;
+  background: none;
+  font-size: 24px;
+  cursor: pointer;
+}
+
+.voltar-texto {
+  margin-left: -8px;
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.campos {
+  grid-area: campos;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--borda);
+}
+
+.campo {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.campo label,
+.rotulo {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--tinta-suave);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.campo-linha {
+  display: flex;
+  gap: 8px;
+}
+
+.campo input {
+  flex: 1;
+  min-width: 0;
+  height: 44px;
+  box-sizing: border-box;
+  padding: 0 12px;
+  border: 1.5px solid var(--borda-forte);
+  border-radius: 4px;
+  background: var(--fundo);
+}
+
+.campo-ativo input {
+  border-color: var(--tinta);
+  outline: 1px solid var(--tinta);
+}
+
+.dica {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--tinta-suave);
+}
+
+.resultados {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--borda-forte);
+  border-radius: 4px;
+}
+
+.resultados li + li {
+  border-top: 1px solid var(--borda);
+}
+
+.resultados button {
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 0;
+  background: none;
+  text-align: left;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.resultados button:hover {
+  background: var(--fundo-suave);
+}
+
+.botao {
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1.5px solid var(--tinta);
+  border-radius: 4px;
+  background: var(--fundo);
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.botao:disabled {
+  cursor: default;
+  border-color: var(--borda-forte);
+  color: var(--tinta-suave);
+}
+
+.botao-principal {
+  min-height: 48px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 4px;
+  background: var(--tinta);
+  color: #ffffff;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.botao-principal:disabled {
+  background: var(--borda-forte);
+  cursor: default;
+}
+
+.base {
+  grid-area: base;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  border-top: 1px solid var(--borda);
+}
+
+.aviso {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 14px;
+  border: 1.5px solid var(--tinta);
+  border-radius: 4px;
+  background: var(--fundo);
+}
+
+.aviso p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.aviso .botao {
+  align-self: flex-start;
+}
+
+.painel-rota {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.resumo {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.resumo-valores {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.valor {
+  font-size: 22px;
+  font-weight: 600;
+}
+
+.selo {
+  font-size: 13px;
+  color: var(--tinta-suave);
+  border: 1px solid var(--borda-forte);
+  border-radius: 12px;
+  padding: 3px 10px;
+  white-space: nowrap;
+}
+
+.restricoes {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.restricoes-grade {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.botao-restricao {
+  min-height: 56px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  text-align: left;
+}
+
+.botao-restricao small {
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.marca {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  padding: 8px 12px;
+  background: var(--fundo);
+  border: 1px solid var(--borda);
+  border-radius: 4px;
+  font-weight: 600;
+  font-size: 17px;
+  letter-spacing: 0.02em;
+}
+
+.comecar {
+  position: absolute;
+  left: 50%;
+  bottom: 48px;
+  transform: translateX(-50%);
+  width: min(320px, calc(100% - 32px));
+  min-height: 52px;
+  font-size: 16px;
+}
+
+.marcador {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--tinta);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 600;
+  border: 2px solid #ffffff;
 }

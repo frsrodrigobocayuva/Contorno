@@ -24,13 +24,21 @@ Recorte do MVP: São Leopoldo e Novo Hamburgo (RS), sobre dados abertos do OpenS
 ## Subir a aplicação
 
 ```bash
-cp .env.example .env    # preencha o contato em NOMINATIM_USER_AGENT
+cp .env.example .env    # preencha o contato em NOMINATIM_USER_AGENT: sem ele a API não sobe
 docker compose up --build
 ```
 
 Abra http://localhost:8000. A primeira subida importa o grafo do GraphHopper e prepara as acelerações CH e LM (cerca de 20 s no recorte atual); as seguintes reaproveitam o volume `graph-cache`. `http://localhost:8000/health` responde `200` quando a API e o motor estão no ar.
 
 Só a porta 8000 é publicada. O GraphHopper fica na rede interna do compose.
+
+A API, na mesma porta (contrato completo em `/docs`):
+
+| Rota | O que faz |
+|---|---|
+| `POST /rotas/calculo` | rota entre origem e destino (`[longitude, latitude]`), ou o diagnóstico quando não há caminho |
+| `GET /enderecos?q=` | até 5 endereços em São Leopoldo e Novo Hamburgo; sem resultado, lista vazia com o motivo |
+| `GET /health` | 200 quando a API e o motor estão no ar |
 
 ## Desenvolver
 
