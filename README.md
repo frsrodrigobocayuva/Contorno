@@ -4,7 +4,7 @@ Planejador de rotas web em que o usuário declara por onde **não** quer passar,
 
 Recorte do MVP: São Leopoldo e Novo Hamburgo (RS), sobre dados abertos do OpenStreetMap.
 
-> **Estado:** em implementação (Sprint 4). O ambiente sobe, mas as funcionalidades ainda não existem.
+> **Estado:** Sprint 4 concluída. Já dá para marcar origem e destino (buscando o endereço ou tocando no mapa) e ver a rota normal com tempo e distância. Declarar o que evitar (áreas, raio a partir de um endereço, classes de via) e ver o custo da escolha chegam na Sprint 5.
 
 ## Pilha
 
