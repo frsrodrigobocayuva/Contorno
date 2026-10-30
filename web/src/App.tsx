@@ -1,6 +1,6 @@
 // O estado de uma consulta fica num ponto só, aqui, e desce para os componentes (DAS 7.2).
 // Telas do protótipo aprovado: 01/14 abertura, 02 origem e destino, 03 rota normal, 13 avisos.
-import { useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   calcularRota,
   ErroDaApi,
@@ -58,6 +58,29 @@ function App() {
   const [rota, setRota] = useState<Rota | null>(null)
   const [aviso, setAviso] = useState<AvisoDaRota | null>(null)
   const [calculando, setCalculando] = useState(false)
+  // Cada cancelamento muda a consulta; a resposta de um cálculo de antes dele é descartada.
+  const consulta = useRef(0)
+
+  // Cancelar apaga tudo e volta para origem e destino vazios (plano, 2026-10-29).
+  const cancelar = useCallback(() => {
+    consulta.current += 1
+    setOrigem(null)
+    setDestino(null)
+    setRota(null)
+    setAviso(null)
+    setCalculando(false)
+    setCampoAtivo('origem')
+    setEtapa('pontos')
+  }, [])
+
+  useEffect(() => {
+    if (etapa === 'abertura') return
+    function aoTeclar(evento: KeyboardEvent) {
+      if (evento.key === 'Escape') cancelar()
+    }
+    window.addEventListener('keydown', aoTeclar)
+    return () => window.removeEventListener('keydown', aoTeclar)
+  }, [etapa, cancelar])
 
   function marcar(campo: Campo, ponto: Ponto) {
     if (campo === 'origem') {
@@ -77,6 +100,7 @@ function App() {
 
   async function calcular() {
     if (!origem || !destino) return
+    const esta = consulta.current
     setCalculando(true)
     setAviso(null)
     try {
@@ -84,6 +108,7 @@ function App() {
         origem.coordenadas,
         destino.coordenadas,
       )
+      if (esta !== consulta.current) return
       if (resposta.tipo === 'ROTAS') {
         setRota(resposta.irrestrita)
         setEtapa('rota')
@@ -94,9 +119,9 @@ function App() {
         })
       }
     } catch (erro) {
-      setAviso(avisoDoErro(erro))
+      if (esta === consulta.current) setAviso(avisoDoErro(erro))
     } finally {
-      setCalculando(false)
+      if (esta === consulta.current) setCalculando(false)
     }
   }
 
@@ -123,6 +148,9 @@ function App() {
             onClick={() => setEtapa('pontos')}
           >
             ‹ A → B
+          </button>
+          <button type="button" className="botao cancelar" onClick={cancelar}>
+            Cancelar rota
           </button>
         </header>
       )}
@@ -156,6 +184,7 @@ function App() {
         destino={destino?.coordenadas}
         rota={etapa === 'rota' ? rota?.geometria.coordinates : null}
         aoTocar={tocarNoMapa}
+        aoCancelar={etapa === 'abertura' ? undefined : cancelar}
       />
       {etapa === 'abertura' && (
         <>
@@ -197,11 +226,24 @@ function App() {
           >
             {calculando ? 'Calculando…' : 'Calcular rota'}
           </button>
+          {(origem || destino) && (
+            <>
+              <button type="button" className="botao" onClick={cancelar}>
+                Cancelar rota
+              </button>
+              <p className="dica atalhos">
+                Esc ou duplo clique no mapa também cancelam a rota.
+              </p>
+            </>
+          )}
         </section>
       )}
       {etapa === 'rota' && rota && (
         <section className="base">
           <PainelDaRota rota={rota} />
+          <p className="dica atalhos">
+            Esc ou duplo clique no mapa também cancelam a rota.
+          </p>
         </section>
       )}
     </div>

@@ -1,17 +1,27 @@
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
 
-// O MapLibre precisa de WebGL, que o jsdom não tem: no lugar dele, um botão que "toca no mapa".
+// O MapLibre precisa de WebGL, que o jsdom não tem: no lugar dele, botões que "tocam no mapa"
+// e dão o duplo clique do mouse (este só quando o App passa quem cancela).
 vi.mock('./mapa/Mapa', () => ({
   Mapa: ({
     aoTocar,
+    aoCancelar,
   }: {
     aoTocar?: (coordenadas: [number, number]) => void
+    aoCancelar?: () => void
   }) => (
-    <button type="button" onClick={() => aoTocar?.([-51.15, -29.79])}>
-      tocar no mapa
-    </button>
+    <>
+      <button type="button" onClick={() => aoTocar?.([-51.15, -29.79])}>
+        tocar no mapa
+      </button>
+      {aoCancelar && (
+        <button type="button" onClick={aoCancelar}>
+          duplo clique no mapa
+        </button>
+      )}
+    </>
   ),
 }))
 
@@ -255,5 +265,97 @@ describe('App', () => {
         'Nem sem nenhuma restrição a malha viária chega ao destino.',
       ),
     ).toBeInTheDocument()
+  })
+  describe('cancelar a rota', () => {
+    function deveEstarVazio() {
+      expect(screen.getByLabelText('Origem')).toHaveValue('')
+      expect(screen.getByLabelText('Destino')).toHaveValue('')
+      expect(
+        screen.getByRole('button', { name: 'Calcular rota' }),
+      ).toBeDisabled()
+      expect(
+        screen.queryByRole('button', { name: 'Cancelar rota' }),
+      ).not.toBeInTheDocument()
+    }
+
+    it('o botão aparece com um ponto marcado e apaga tudo', () => {
+      comecar()
+      expect(
+        screen.queryByRole('button', { name: 'Cancelar rota' }),
+      ).not.toBeInTheDocument()
+      marcarOrigemEDestino()
+
+      fireEvent.click(screen.getByRole('button', { name: 'Cancelar rota' }))
+
+      deveEstarVazio()
+      fireEvent.click(screen.getByRole('button', { name: 'tocar no mapa' }))
+      expect(screen.getByLabelText('Origem')).toHaveValue(
+        'Ponto marcado no mapa',
+      )
+    })
+
+    it('na rota, o botão do topo volta para origem e destino vazios', async () => {
+      api([[/^\/rotas\/calculo$/, () => json(ROTA)]])
+      comecar()
+      marcarOrigemEDestino()
+      fireEvent.click(screen.getByRole('button', { name: 'Calcular rota' }))
+      await screen.findByText('13 min · 12,8 km')
+
+      fireEvent.click(screen.getByRole('button', { name: 'Cancelar rota' }))
+
+      expect(screen.queryByText('13 min · 12,8 km')).not.toBeInTheDocument()
+      deveEstarVazio()
+    })
+
+    it('o Esc cancela, também na rota', async () => {
+      api([[/^\/rotas\/calculo$/, () => json(ROTA)]])
+      comecar()
+      marcarOrigemEDestino()
+      fireEvent.click(screen.getByRole('button', { name: 'Calcular rota' }))
+      await screen.findByText('13 min · 12,8 km')
+
+      fireEvent.keyDown(window, { key: 'Escape' })
+
+      deveEstarVazio()
+    })
+
+    it('o duplo clique no mapa cancela, mas não existe na abertura', () => {
+      render(<App />)
+      expect(
+        screen.queryByRole('button', { name: 'duplo clique no mapa' }),
+      ).not.toBeInTheDocument()
+      fireEvent.click(screen.getByRole('button', { name: 'Começar' }))
+      marcarOrigemEDestino()
+
+      fireEvent.click(
+        screen.getByRole('button', { name: 'duplo clique no mapa' }),
+      )
+
+      deveEstarVazio()
+    })
+
+    it('a rota que chega depois de cancelar é descartada', async () => {
+      let responder: (resposta: Response) => void = () => {}
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(
+          () =>
+            new Promise<Response>((resolver) => {
+              responder = resolver
+            }),
+        ),
+      )
+      comecar()
+      marcarOrigemEDestino()
+      fireEvent.click(screen.getByRole('button', { name: 'Calcular rota' }))
+
+      fireEvent.click(screen.getByRole('button', { name: 'Cancelar rota' }))
+      await act(async () => {
+        responder(json(ROTA))
+      })
+
+      expect(screen.queryByText('13 min · 12,8 km')).not.toBeInTheDocument()
+      deveEstarVazio()
+    })
   })
 })
