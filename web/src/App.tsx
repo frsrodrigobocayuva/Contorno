@@ -149,9 +149,6 @@ function App() {
           >
             ‹ A → B
           </button>
-          <button type="button" className="botao cancelar" onClick={cancelar}>
-            Cancelar rota
-          </button>
         </header>
       )}
       {etapa === 'pontos' && (
@@ -241,6 +238,9 @@ function App() {
       {etapa === 'rota' && rota && (
         <section className="base">
           <PainelDaRota rota={rota} />
+          <button type="button" className="botao" onClick={cancelar}>
+            Cancelar rota
+          </button>
           <p className="dica atalhos">
             Esc ou duplo clique no mapa também cancelam a rota.
           </p>
