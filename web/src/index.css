@@ -96,6 +96,22 @@ input {
   font-weight: 500;
 }
 
+/* Cancelar rota, à direita do topo (telas 03 e 15). */
+.topo .cancelar {
+  margin-left: auto;
+}
+
+/* Esc e duplo clique valem só com teclado e mouse; no celular a dica some. */
+.atalhos {
+  display: none;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .atalhos {
+    display: block;
+  }
+}
+
 .campos {
   grid-area: campos;
   display: flex;
