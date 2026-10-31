@@ -5,7 +5,13 @@ from typing import Annotated, Literal
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
 
-from app.dominio.modelo import CausaDeInviabilidade, Extremo, MotivoDeBuscaVazia
+from app.dominio.modelo import (
+    CausaDeInviabilidade,
+    ClasseDeVia,
+    Extremo,
+    MotivoDeBuscaVazia,
+    NivelDeEvitacao,
+)
 
 Longitude = Annotated[float, Field(ge=-180, le=180)]
 Latitude = Annotated[float, Field(ge=-90, le=90)]
@@ -29,12 +35,23 @@ class RestricaoArea(Modelo):
     celulas: list[CelulaHex] = Field(min_length=1, max_length=20_000)
 
 
+class RestricaoVia(Modelo):
+    """Preferência por classe de via (UC03): penaliza, nunca proíbe (RN06)."""
+
+    tipo: Literal["VIA"]
+    classe: ClasseDeVia
+    nivel: NivelDeEvitacao
+
+
+Restricao = Annotated[RestricaoArea | RestricaoVia, Field(discriminator="tipo")]
+
+
 class PedidoDeRota(Modelo):
     origem: Ponto
     destino: Ponto
-    restricoes: list[RestricaoArea] = Field(
+    restricoes: list[Restricao] = Field(
         default_factory=list,
-        description="Áreas declaradas; as preferências de via entram na S5-02.",
+        description="Áreas declaradas e preferências por classe de via, uma por classe.",
     )
 
 

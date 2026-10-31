@@ -215,7 +215,7 @@ describe('App', () => {
     expect(calcular).toBeEnabled()
   })
 
-  it('calcula e mostra a rota normal, com o raio e as classes em breve', async () => {
+  it('calcula e mostra a rota normal, com só o raio em breve', async () => {
     const fetch = api([[/^\/rotas\/calculo$/, () => json(ROTA)]])
     comecar()
     marcarOrigemEDestino()
@@ -225,7 +225,10 @@ describe('App', () => {
     expect(await screen.findByText('13 min · 12,8 km')).toBeInTheDocument()
     expect(screen.getByText('nenhuma restrição')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Desenhar área/ })).toBeEnabled()
-    expect(screen.getAllByText('em breve')).toHaveLength(2)
+    expect(
+      screen.getByRole('button', { name: /Classes de via a evitar/ }),
+    ).toBeEnabled()
+    expect(screen.getAllByText('em breve')).toHaveLength(1)
     const corpo = JSON.parse(fetch.mock.calls[0][1]!.body as string)
     expect(corpo).toEqual({
       origem: [-51.15, -29.79],
@@ -654,6 +657,83 @@ describe('App', () => {
       expect(
         screen.queryByRole('button', { name: 'Começar' }),
       ).not.toBeInTheDocument()
+    })
+  })
+
+  describe('classes de via (S5-02)', () => {
+    const RESTRITA = {
+      ...ROTA,
+      restrita: {
+        ...ROTA.irrestrita,
+        duracaoSegundos: 786 + 120,
+        distanciaMetros: 12_799 + 900,
+      },
+    }
+    type Corpo = { restricoes?: object[] }
+    const corpo = (opcoes?: RequestInit) =>
+      JSON.parse(opcoes!.body as string) as Corpo
+
+    async function ateAsClasses() {
+      const fetch = api([
+        [
+          /^\/rotas\/calculo$/,
+          (opcoes) => json(corpo(opcoes).restricoes?.length ? RESTRITA : ROTA),
+        ],
+      ])
+      comecar()
+      marcarOrigemEDestino()
+      fireEvent.click(screen.getByRole('button', { name: 'Calcular rota' }))
+      fireEvent.click(
+        await screen.findByRole('button', { name: /Classes de via a evitar/ }),
+      )
+      return fetch
+    }
+
+    function escolher(classe: RegExp, nivel: string) {
+      fireEvent.click(
+        within(screen.getByRole('group', { name: classe })).getByRole('radio', {
+          name: nivel,
+        }),
+      )
+    }
+
+    it('aplica as classes, recalcula e conta como restrição', async () => {
+      const fetch = await ateAsClasses()
+      expect(screen.getByText(/mas não garante/)).toBeInTheDocument()
+
+      escolher(/^Rodovia/, 'Evitar fortemente')
+      fireEvent.click(
+        screen.getByRole('button', { name: 'Aplicar e recalcular' }),
+      )
+
+      expect(await screen.findByText('Custo da restrição')).toBeInTheDocument()
+      expect(screen.getByText('1 restrição aplicada')).toBeInTheDocument()
+      expect(corpo(fetch.mock.calls.at(-1)![1]).restricoes).toEqual([
+        { tipo: 'VIA', classe: 'RODOVIA', nivel: 'EVITAR_FORTEMENTE' },
+      ])
+
+      fireEvent.click(screen.getByRole('button', { name: /Ver restrições/ }))
+      const lista = screen.getByRole('region', { name: 'Classes de via' })
+      expect(within(lista).getByText('Rodovia')).toBeInTheDocument()
+      expect(within(lista).getByText('evitar fortemente')).toBeInTheDocument()
+    })
+
+    it('cancelar na tela das classes descarta o que foi escolhido', async () => {
+      const fetch = await ateAsClasses()
+      escolher(/^Rua residencial/, 'Evitar')
+
+      fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
+
+      expect(screen.getByText('nenhuma restrição')).toBeInTheDocument()
+      expect(fetch).toHaveBeenCalledTimes(1)
+      fireEvent.click(
+        screen.getByRole('button', { name: /Classes de via a evitar/ }),
+      )
+      expect(
+        within(
+          screen.getByRole('group', { name: /^Rua residencial/ }),
+        ).getByRole('radio', { name: 'Indiferente' }),
+      ).toBeChecked()
     })
   })
 })

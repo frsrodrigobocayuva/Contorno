@@ -45,7 +45,7 @@ DESVIO = Rota((UNISINOS, Coordenada(-51.175, -29.740), CENTRO_NH), 1500, 14_100)
 
 
 class MotorFalso:
-    """Devolve a rota da vez: `restrita` quando há exclusões, `rota` quando não há."""
+    """Devolve a rota da vez: `restrita` quando há exclusões ou regras, `rota` quando não há."""
 
     def __init__(
         self,
@@ -70,7 +70,7 @@ class MotorFalso:
         self.em_voo -= 1
         if self.erro:
             raise self.erro
-        return self.restrita if exclusoes else self.rota
+        return self.restrita if exclusoes or opcoes.regras else self.rota
 
 
 async def test_calcula_a_irrestrita_sem_exclusoes_nem_opcoes() -> None:
@@ -93,15 +93,41 @@ async def test_motor_indisponivel_passa_adiante() -> None:
         await OrquestradorDeRota(MotorFalso(erro=MotorIndisponivel())).calcular(CONSULTA)
 
 
-async def test_preferencias_de_via_ainda_nao_sao_aceitas() -> None:
+async def test_so_preferencias_pedem_a_restrita_com_as_regras_sem_validar() -> None:
     preferencia = PreferenciaVia(ClasseDeVia.RESIDENCIAL, NivelDeEvitacao.EVITAR)
-    motor = MotorFalso(ROTA)
+    motor = MotorFalso(ROTA, restrita=ROTA)
 
-    with pytest.raises(ValueError):
-        await OrquestradorDeRota(motor).calcular(
-            ConsultaDeRota(UNISINOS, CENTRO_NH, (preferencia,))
-        )
-    assert motor.chamadas == []
+    resultado = await OrquestradorDeRota(motor).calcular(
+        ConsultaDeRota(UNISINOS, CENTRO_NH, (preferencia,))
+    )
+
+    assert resultado == ResultadoComparativo(ROTA, ROTA, (preferencia,))
+    (_, sem_regras, sem_opcoes), (_, exclusoes, opcoes) = motor.chamadas
+    assert (sem_regras, sem_opcoes) == ((), OpcoesDeCusto())
+    assert exclusoes == ()
+    assert [(r.chave_osm, r.fator) for r in opcoes.regras] == [("highway", 0.5)]
+
+
+async def test_so_preferencia_indiferente_e_rota_sem_restricao() -> None:
+    preferencia = PreferenciaVia(ClasseDeVia.RODOVIA, NivelDeEvitacao.INDIFERENTE)
+    motor = MotorFalso(ROTA, restrita=DESVIO)
+
+    resultado = await OrquestradorDeRota(motor).calcular(
+        ConsultaDeRota(UNISINOS, CENTRO_NH, (preferencia,))
+    )
+
+    assert resultado == ResultadoComparativo(ROTA)
+    assert len(motor.chamadas) == 1
+
+
+async def test_so_preferencias_sem_restrita_e_destino_inalcancavel() -> None:
+    preferencia = PreferenciaVia(ClasseDeVia.RODOVIA, NivelDeEvitacao.EVITAR)
+
+    resultado = await OrquestradorDeRota(MotorFalso(ROTA, restrita=None)).calcular(
+        ConsultaDeRota(UNISINOS, CENTRO_NH, (preferencia,))
+    )
+
+    assert resultado == Diagnostico(CausaDeInviabilidade.DESTINO_INALCANCAVEL)
 
 
 # Com áreas (S5-01)
@@ -168,3 +194,17 @@ async def test_restrita_que_cruza_a_area_e_descartada(caplog: pytest.LogCaptureF
 
     assert resultado == Diagnostico(CausaDeInviabilidade.AREAS_BLOQUEIAM)
     assert "descartada" in caplog.text
+
+
+async def test_area_e_preferencia_vao_juntas_na_restrita() -> None:
+    preferencia = PreferenciaVia(ClasseDeVia.SEM_PAVIMENTACAO, NivelDeEvitacao.EVITAR_FORTEMENTE)
+    motor = MotorFalso(ROTA, restrita=DESVIO)
+
+    resultado = await OrquestradorDeRota(motor).calcular(
+        ConsultaDeRota(UNISINOS, CENTRO_NH, (AREA, preferencia))
+    )
+
+    assert resultado == ResultadoComparativo(ROTA, DESVIO, (AREA, preferencia))
+    _, (_, exclusoes, opcoes) = motor.chamadas
+    assert len(exclusoes) == 1
+    assert [(r.chave_osm, r.fator) for r in opcoes.regras] == [("surface", 0.05)]

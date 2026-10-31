@@ -144,7 +144,7 @@ async def test_ponto_fora_da_regiao_e_422() -> None:
     [
         (
             {"origem": UNISINOS, "destino": CENTRO_NH, "restricoes": [{"tipo": "AREA"}]},
-            "restricoes.0.celulas",
+            "restricoes.0.AREA.celulas",
         ),
         ({"origem": [200, 0], "destino": CENTRO_NH}, "origem.0"),
         ({"origem": UNISINOS}, "destino"),
@@ -423,3 +423,48 @@ async def test_celulas_invalidas_sao_recusadas(
     assert resposta.status_code == 422
     assert resposta.json()["codigo"] == "VALIDACAO"
     assert motivo in resposta.json()["detalhes"][0]["motivo"]
+
+
+# Preferências por classe de via (S5-02)
+
+
+def com_vias(*vias: tuple[str, str]) -> dict[str, object]:
+    return {
+        "origem": UNISINOS,
+        "destino": CENTRO_NH,
+        "restricoes": [{"tipo": "VIA", "classe": c, "nivel": n} for c, n in vias],
+    }
+
+
+async def test_rota_com_preferencia_traz_a_restrita() -> None:
+    async with api() as cliente:
+        resposta = await calcular(cliente, com_vias(("RODOVIA", "EVITAR_FORTEMENTE")))
+
+    assert resposta.status_code == 200
+    assert resposta.json()["restrita"] == resposta.json()["irrestrita"]
+
+
+async def test_preferencia_indiferente_nao_conta_como_restricao() -> None:
+    async with api() as cliente:
+        resposta = await calcular(cliente, com_vias(("RODOVIA", "INDIFERENTE")))
+
+    assert resposta.status_code == 200
+    assert resposta.json()["restrita"] is None
+
+
+async def test_classe_repetida_e_recusada() -> None:
+    async with api() as cliente:
+        resposta = await calcular(
+            cliente, com_vias(("RODOVIA", "EVITAR"), ("RODOVIA", "EVITAR_FORTEMENTE"))
+        )
+
+    assert resposta.status_code == 422
+    assert resposta.json()["detalhes"] == [{"campo": "restricoes", "motivo": "CLASSE_REPETIDA"}]
+
+
+async def test_classe_desconhecida_fica_fora_do_esquema() -> None:
+    async with api() as cliente:
+        resposta = await calcular(cliente, com_vias(("ESTRADA_DE_TERRA", "EVITAR")))
+
+    assert resposta.status_code == 422
+    assert resposta.json()["codigo"] == "VALIDACAO"

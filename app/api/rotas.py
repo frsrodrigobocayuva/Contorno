@@ -11,10 +11,20 @@ from app.api.esquemas import (
     RespostaCalculo,
     RespostaDiagnostico,
     RespostaRotas,
+    RestricaoArea,
+    RestricaoVia,
     RotaDTO,
 )
 from app.dominio import indexador
-from app.dominio.modelo import AreaExcluida, ConsultaDeRota, Coordenada, Diagnostico, Rota
+from app.dominio.modelo import (
+    AreaExcluida,
+    ConsultaDeRota,
+    Coordenada,
+    Diagnostico,
+    NivelDeEvitacao,
+    PreferenciaVia,
+    Rota,
+)
 
 # Teto de células de uma área descompactada: o recorte inteiro, na resolução 11, tem cerca de
 # 265 mil. Protege a API de um conjunto compactado que explodiria na descompactação.
@@ -45,9 +55,20 @@ async def calcular(pedido: PedidoDeRota, dependencias: Deps) -> RespostaRotas | 
     ]
     if fora:
         raise EntradaInvalida(fora)
-    ids = [r.id for r in pedido.restricoes]
+    pedidas_areas = [r for r in pedido.restricoes if isinstance(r, RestricaoArea)]
+    pedidas_vias = [r for r in pedido.restricoes if isinstance(r, RestricaoVia)]
+    ids = [r.id for r in pedidas_areas]
     if len(set(ids)) != len(ids):
         raise EntradaInvalida([{"campo": "restricoes", "motivo": "ID_REPETIDO"}])
+    classes = [r.classe for r in pedidas_vias]
+    if len(set(classes)) != len(classes):
+        raise EntradaInvalida([{"campo": "restricoes", "motivo": "CLASSE_REPETIDA"}])
+    # "Indiferente" não muda nada: nem vira regra, nem conta como restrição aplicada.
+    preferencias = tuple(
+        PreferenciaVia(r.classe, r.nivel)
+        for r in pedidas_vias
+        if r.nivel is not NivelDeEvitacao.INDIFERENTE
+    )
     try:
         areas = tuple(
             AreaExcluida(
@@ -59,11 +80,13 @@ async def calcular(pedido: PedidoDeRota, dependencias: Deps) -> RespostaRotas | 
                     LIMITE_DE_CELULAS,
                 ),
             )
-            for r in pedido.restricoes
+            for r in pedidas_areas
         )
     except ValueError as erro:
         raise EntradaInvalida([{"campo": "restricoes", "motivo": str(erro)}]) from erro
-    consulta = ConsultaDeRota(Coordenada(*pedido.origem), Coordenada(*pedido.destino), areas)
+    consulta = ConsultaDeRota(
+        Coordenada(*pedido.origem), Coordenada(*pedido.destino), (*areas, *preferencias)
+    )
     resultado = await dependencias.orquestrador.calcular(consulta)
     if isinstance(resultado, Diagnostico):
         return RespostaDiagnostico(

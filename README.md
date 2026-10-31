@@ -4,7 +4,7 @@ Planejador de rotas web em que o usuário declara por onde **não** quer passar,
 
 Recorte do MVP: São Leopoldo e Novo Hamburgo (RS), sobre dados abertos do OpenStreetMap.
 
-> **Estado:** Sprint 5 em andamento. Já dá para marcar origem e destino (buscando o endereço ou tocando no mapa), ver a rota normal, desenhar áreas proibidas e ver a rota que as evita, com o custo da escolha. O raio a partir de um endereço, as classes de via e o diagnóstico que aponta a área que bloqueia chegam ainda na Sprint 5.
+> **Estado:** Sprint 5 em andamento. Já dá para marcar origem e destino (buscando o endereço ou tocando no mapa), ver a rota normal, desenhar áreas proibidas, escolher quanto evitar cada classe de via e ver a rota que obedece, com o custo da escolha. O raio a partir de um endereço e o diagnóstico que aponta a área que bloqueia chegam ainda na Sprint 5.
 
 ## Pilha
 
@@ -36,7 +36,7 @@ A API, na mesma porta (contrato completo em `/docs`):
 
 | Rota | O que faz |
 |---|---|
-| `POST /rotas/calculo` | rota normal entre origem e destino (`[longitude, latitude]`) e, com áreas em `restricoes`, a rota que as evita; ou o diagnóstico quando não há caminho |
+| `POST /rotas/calculo` | rota normal entre origem e destino (`[longitude, latitude]`) e, com áreas ou preferências de via em `restricoes`, a rota que obedece; ou o diagnóstico quando não há caminho |
 | `POST /restricoes/area` | o desenho de uma área vira células H3: devolve as células, o contorno, a área desenhada e a proibida em m² e os conflitos com a origem e o destino |
 | `GET /enderecos?q=` | até 5 endereços em São Leopoldo e Novo Hamburgo; sem resultado, lista vazia com o motivo |
 | `GET /health` | 200 quando a API e o motor estão no ar |

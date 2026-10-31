@@ -179,6 +179,16 @@
         ],
         "title": "CausaDeInviabilidade"
       },
+      "ClasseDeVia": {
+        "type": "string",
+        "enum": [
+          "SEM_PAVIMENTACAO",
+          "RESIDENCIAL",
+          "ARTERIAL",
+          "RODOVIA"
+        ],
+        "title": "ClasseDeVia"
+      },
       "Erro": {
         "properties": {
           "codigo": {
@@ -345,6 +355,15 @@
         ],
         "title": "MultiPoligonoGeoJSON"
       },
+      "NivelDeEvitacao": {
+        "type": "string",
+        "enum": [
+          "INDIFERENTE",
+          "EVITAR",
+          "EVITAR_FORTEMENTE"
+        ],
+        "title": "NivelDeEvitacao"
+      },
       "PedidoDeArea": {
         "properties": {
           "poligono": {
@@ -470,11 +489,25 @@
           },
           "restricoes": {
             "items": {
-              "$ref": "#/components/schemas/RestricaoArea"
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/RestricaoArea"
+                },
+                {
+                  "$ref": "#/components/schemas/RestricaoVia"
+                }
+              ],
+              "discriminator": {
+                "propertyName": "tipo",
+                "mapping": {
+                  "AREA": "#/components/schemas/RestricaoArea",
+                  "VIA": "#/components/schemas/RestricaoVia"
+                }
+              }
             },
             "type": "array",
             "title": "Restricoes",
-            "description": "Áreas declaradas; as preferências de via entram na S5-02."
+            "description": "Áreas declaradas e preferências por classe de via, uma por classe."
           }
         },
         "additionalProperties": false,
@@ -658,6 +691,30 @@
         ],
         "title": "RestricaoArea",
         "description": "Área declarada, com as células que o cliente recebeu em /restricoes/area (UC01, [2])."
+      },
+      "RestricaoVia": {
+        "properties": {
+          "tipo": {
+            "type": "string",
+            "const": "VIA",
+            "title": "Tipo"
+          },
+          "classe": {
+            "$ref": "#/components/schemas/ClasseDeVia"
+          },
+          "nivel": {
+            "$ref": "#/components/schemas/NivelDeEvitacao"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "tipo",
+          "classe",
+          "nivel"
+        ],
+        "title": "RestricaoVia",
+        "description": "Preferência por classe de via (UC03): penaliza, nunca proíbe (RN06)."
       },
       "RotaDTO": {
         "properties": {
