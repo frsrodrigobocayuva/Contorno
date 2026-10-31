@@ -12,6 +12,9 @@ export type RespostaEnderecos = Esquemas['RespostaEnderecos']
 export type Lugar = Esquemas['LugarDTO']
 export type RespostaArea = Esquemas['RespostaArea']
 export type RestricaoArea = Esquemas['RestricaoArea']
+export type RestricaoVia = Esquemas['RestricaoVia']
+export type ClasseDeVia = Esquemas['ClasseDeVia']
+export type NivelDeEvitacao = Esquemas['NivelDeEvitacao']
 export type Contorno = Esquemas['MultiPoligonoGeoJSON']
 
 // Validação: campo e motivo; área com extremo dentro (AREA_CONTEM_EXTREMO): área e extremo.
@@ -63,7 +66,7 @@ async function pedir<T>(caminho: string, opcoes?: RequestInit): Promise<T> {
 export function calcularRota(
   origem: Coordenadas,
   destino: Coordenadas,
-  restricoes: RestricaoArea[] = [],
+  restricoes: (RestricaoArea | RestricaoVia)[] = [],
 ): Promise<RespostaCalculo> {
   return pedir('/rotas/calculo', {
     method: 'POST',

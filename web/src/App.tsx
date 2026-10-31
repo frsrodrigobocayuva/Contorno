@@ -6,7 +6,9 @@ import {
   calcularRota,
   definirArea,
   ErroDaApi,
+  type ClasseDeVia,
   type Coordenadas,
+  type NivelDeEvitacao,
   type RespostaArea,
   type Rota,
 } from './api/cliente'
@@ -21,15 +23,28 @@ import {
   rotuloPadrao,
   type AreaDeclarada,
 } from './restricoes/areas'
+import {
+  paraPreferencias,
+  preferenciasAtivas,
+  SEM_PREFERENCIAS,
+  type Niveis,
+} from './restricoes/classes'
 import type { EstadoDoDesenho } from './restricoes/editor'
 import { ListaDeRestricoes } from './restricoes/ListaDeRestricoes'
 import {
   PainelDaConferencia,
   PainelDoDesenho,
 } from './restricoes/PaineisDaArea'
+import { PainelDasClasses } from './restricoes/PainelDasClasses'
 
 type Etapa =
-  'abertura' | 'pontos' | 'rota' | 'desenhar' | 'conferir' | 'restricoes'
+  | 'abertura'
+  | 'pontos'
+  | 'rota'
+  | 'desenhar'
+  | 'conferir'
+  | 'classes'
+  | 'restricoes'
 
 interface AvisoDaRota {
   titulo: string
@@ -102,6 +117,10 @@ function App() {
   const [rota, setRota] = useState<Rota | null>(null)
   const [restrita, setRestrita] = useState<Rota | null>(null)
   const [areas, setAreas] = useState<AreaDeclarada[]>([])
+  const [niveis, setNiveis] = useState<Niveis>(SEM_PREFERENCIAS)
+  // A tela 09 edita um rascunho; só "Aplicar e recalcular" o torna a preferência da consulta.
+  const [rascunhoDeNiveis, setRascunhoDeNiveis] =
+    useState<Niveis>(SEM_PREFERENCIAS)
   const [desenho, setDesenho] = useState<{
     inicial?: Coordenadas[]
     editando?: string
@@ -129,6 +148,7 @@ function App() {
     setRota(null)
     setRestrita(null)
     setAreas([])
+    setNiveis(SEM_PREFERENCIAS)
     setDesenho(null)
     setConferencia(null)
     setAviso(null)
@@ -147,12 +167,15 @@ function App() {
 
   // O Esc desfaz um nível por vez: no desenho e na conferência, desiste só da área; nas outras
   // telas, cancela a rota; com tudo vazio, volta para a abertura (teste do usuário, 2026-10-31).
-  const vazio = !origem && !destino && areas.length === 0
+  const classesAtivas = preferenciasAtivas(niveis)
+  const vazio =
+    !origem && !destino && areas.length === 0 && classesAtivas.length === 0
   useEffect(() => {
     if (etapa === 'abertura') return
     function aoTeclar(evento: KeyboardEvent) {
       if (evento.key !== 'Escape') return
-      if (etapa === 'desenhar' || etapa === 'conferir') sairDaArea()
+      if (etapa === 'desenhar' || etapa === 'conferir' || etapa === 'classes')
+        sairDaArea()
       else if (etapa === 'pontos' && vazio) setEtapa('abertura')
       else cancelar()
     }
@@ -179,7 +202,10 @@ function App() {
       marcar(campoAtivo, { nome: PONTO_NO_MAPA, coordenadas })
   }
 
-  async function calcular(comAreas: AreaDeclarada[] = areas) {
+  async function calcular(
+    comAreas: AreaDeclarada[] = areas,
+    comNiveis: Niveis = niveis,
+  ) {
     if (!origem || !destino) return
     const esta = consulta.current
     setCalculando(true)
@@ -188,7 +214,7 @@ function App() {
       const resposta = await calcularRota(
         origem.coordenadas,
         destino.coordenadas,
-        paraRestricoes(comAreas),
+        [...paraRestricoes(comAreas), ...paraPreferencias(comNiveis)],
       )
       if (esta !== consulta.current) return
       if (resposta.tipo === 'ROTAS') {
@@ -285,6 +311,19 @@ function App() {
     setEtapa('desenhar')
   }
 
+  function abrirClasses() {
+    setRascunhoDeNiveis(niveis)
+    setAviso(null)
+    setEtapa('classes')
+  }
+
+  function aplicarClasses() {
+    setNiveis(rascunhoDeNiveis)
+    setRestrita(null)
+    setEtapa('rota')
+    void calcular(areas, rascunhoDeNiveis)
+  }
+
   function removerArea(id: string) {
     setAreas((atuais) => atuais.filter((a) => a.id !== id))
     setRestrita(null)
@@ -330,15 +369,19 @@ function App() {
           </button>
         </header>
       )}
-      {(etapa === 'desenhar' || etapa === 'conferir') && (
+      {(etapa === 'desenhar' ||
+        etapa === 'conferir' ||
+        etapa === 'classes') && (
         <header className="topo">
           <span className="topo-titulo">
             {etapa === 'desenhar'
               ? 'Desenhar área proibida'
-              : 'Confira a área proibida'}
+              : etapa === 'conferir'
+                ? 'Confira a área proibida'
+                : 'Classes de via'}
           </span>
           <button type="button" className="acao-topo" onClick={sairDaArea}>
-            {etapa === 'desenhar' ? 'Cancelar' : 'Descartar'}
+            {etapa === 'conferir' ? 'Descartar' : 'Cancelar'}
           </button>
         </header>
       )}
@@ -459,8 +502,9 @@ function App() {
             <PainelDaRota
               rota={rota}
               restrita={restrita}
-              quantasRestricoes={areas.length}
+              quantasRestricoes={areas.length + classesAtivas.length}
               aoDesenharArea={() => desenharArea()}
+              aoClassesDeVia={abrirClasses}
               aoVerRestricoes={() => setEtapa('restricoes')}
             />
           )}
@@ -505,10 +549,24 @@ function App() {
           />
         </section>
       )}
+      {etapa === 'classes' && (
+        <section className="base">
+          <PainelDasClasses
+            niveis={rascunhoDeNiveis}
+            calculando={calculando}
+            aoMudar={(classe: ClasseDeVia, nivel: NivelDeEvitacao) =>
+              setRascunhoDeNiveis((atual) => ({ ...atual, [classe]: nivel }))
+            }
+            aoAplicar={aplicarClasses}
+          />
+        </section>
+      )}
       {etapa === 'restricoes' && (
         <section className="base">
           <ListaDeRestricoes
             areas={areas}
+            classes={classesAtivas}
+            aoAlterarClasses={abrirClasses}
             calculando={calculando}
             aoRedesenhar={(id) => desenharArea(areas.find((a) => a.id === id))}
             aoRemover={removerArea}

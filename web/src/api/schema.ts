@@ -97,6 +97,11 @@ export interface components {
          */
         CausaDeInviabilidade: "DESTINO_INALCANCAVEL" | "RESTRICAO_UNICA" | "COMBINACAO_DE_RESTRICOES" | "AREAS_BLOQUEIAM";
         /**
+         * ClasseDeVia
+         * @enum {string}
+         */
+        ClasseDeVia: "SEM_PAVIMENTACAO" | "RESIDENCIAL" | "ARTERIAL" | "RODOVIA";
+        /**
          * Erro
          * @description Formato único de erro (DAS 6.9).
          */
@@ -159,6 +164,11 @@ export interface components {
             ][][][];
         };
         /**
+         * NivelDeEvitacao
+         * @enum {string}
+         */
+        NivelDeEvitacao: "INDIFERENTE" | "EVITAR" | "EVITAR_FORTEMENTE";
+        /**
          * PedidoDeArea
          * @description Desenho do usuário (UC02) e, se já escolhidos, a origem e o destino da consulta.
          */
@@ -196,9 +206,9 @@ export interface components {
             ];
             /**
              * Restricoes
-             * @description Áreas declaradas; as preferências de via entram na S5-02.
+             * @description Áreas declaradas e preferências por classe de via, uma por classe.
              */
-            restricoes?: components["schemas"]["RestricaoArea"][];
+            restricoes?: (components["schemas"]["RestricaoArea"] | components["schemas"]["RestricaoVia"])[];
         };
         /**
          * RespostaArea
@@ -259,8 +269,8 @@ export interface components {
          */
         RestricaoArea: {
             /**
-             * Tipo
-             * @constant
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
              */
             tipo: "AREA";
             /**
@@ -275,6 +285,19 @@ export interface components {
             rotulo: string;
             /** Celulas */
             celulas: string[];
+        };
+        /**
+         * RestricaoVia
+         * @description Preferência por classe de via (UC03): penaliza, nunca proíbe (RN06).
+         */
+        RestricaoVia: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            tipo: "VIA";
+            classe: components["schemas"]["ClasseDeVia"];
+            nivel: components["schemas"]["NivelDeEvitacao"];
         };
         /** RotaDTO */
         RotaDTO: {

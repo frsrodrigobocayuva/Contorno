@@ -9,6 +9,7 @@ interface Props {
   restrita: Rota | null
   quantasRestricoes: number
   aoDesenharArea: () => void
+  aoClassesDeVia: () => void
   aoVerRestricoes: () => void
 }
 
@@ -20,8 +21,14 @@ function restricoes(n: number) {
   return n === 1 ? '1 restrição aplicada' : `${n} restrições aplicadas`
 }
 
-// Raio e classes de via entram na S5-04 e na S5-02; até lá, desativados com "em breve".
-function AplicarRestricoes({ aoDesenharArea }: { aoDesenharArea: () => void }) {
+// O raio entra na S5-04; até lá, desativado com "em breve".
+function AplicarRestricoes({
+  aoDesenharArea,
+  aoClassesDeVia,
+}: {
+  aoDesenharArea: () => void
+  aoClassesDeVia: () => void
+}) {
   return (
     <div className="restricoes">
       <span className="rotulo">Aplicar restrições</span>
@@ -33,19 +40,17 @@ function AplicarRestricoes({ aoDesenharArea }: { aoDesenharArea: () => void }) {
         >
           Desenhar área
         </button>
-        {['Raio a partir de endereço', 'Classes de via a evitar'].map(
-          (nome) => (
-            <button
-              key={nome}
-              type="button"
-              className="botao botao-restricao"
-              disabled
-            >
-              {nome}
-              <small>em breve</small>
-            </button>
-          ),
-        )}
+        <button type="button" className="botao botao-restricao" disabled>
+          Raio a partir de endereço
+          <small>em breve</small>
+        </button>
+        <button
+          type="button"
+          className="botao botao-restricao"
+          onClick={aoClassesDeVia}
+        >
+          Classes de via a evitar
+        </button>
       </div>
     </div>
   )
@@ -56,6 +61,7 @@ export function PainelDaRota({
   restrita,
   quantasRestricoes,
   aoDesenharArea,
+  aoClassesDeVia,
   aoVerRestricoes,
 }: Props) {
   const [escolhendo, setEscolhendo] = useState(false)
@@ -79,7 +85,10 @@ export function PainelDaRota({
             Ver restrições ({quantasRestricoes})
           </button>
         )}
-        <AplicarRestricoes aoDesenharArea={aoDesenharArea} />
+        <AplicarRestricoes
+          aoDesenharArea={aoDesenharArea}
+          aoClassesDeVia={aoClassesDeVia}
+        />
       </div>
     )
   }
@@ -137,7 +146,12 @@ export function PainelDaRota({
           + Restrição
         </button>
       </div>
-      {escolhendo && <AplicarRestricoes aoDesenharArea={aoDesenharArea} />}
+      {escolhendo && (
+        <AplicarRestricoes
+          aoDesenharArea={aoDesenharArea}
+          aoClassesDeVia={aoClassesDeVia}
+        />
+      )}
     </div>
   )
 }
