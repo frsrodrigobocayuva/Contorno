@@ -112,14 +112,16 @@ async def test_restrita_vai_com_as_areas_no_custom_model_e_sem_ch() -> None:
     assert corpo["points_encoded"] is False
     features = corpo["custom_model"]["areas"]["features"]
     assert [f["id"] for f in features] == ["area0", "area1"]
-    assert features[0]["geometry"] == {
-        "type": "Polygon",
-        "coordinates": [
-            [[0, 0], [1, 0], [1, 1], [0, 1], [0, 0]],
-            [[0.4, 0.4], [0.6, 0.4], [0.6, 0.6], [0.4, 0.4]],
-        ],
-    }
-    assert features[1]["geometry"]["coordinates"] == [[[2, 2], [3, 2], [3, 3], [2, 2]]]
+    # Cada área vai com os dois triângulos fora do recorte, que alargam o retângulo dela.
+    assert features[0]["geometry"]["type"] == "MultiPolygon"
+    area, *fora = features[0]["geometry"]["coordinates"]
+    assert area == [
+        [[0, 0], [1, 0], [1, 1], [0, 1], [0, 0]],
+        [[0.4, 0.4], [0.6, 0.4], [0.6, 0.6], [0.4, 0.4]],
+    ]
+    assert len(fora) == 2
+    assert all(abs(lon + 51) > 1.4 or abs(lat + 29.7) > 1 for lon, lat in fora[0][0] + fora[1][0])
+    assert features[1]["geometry"]["coordinates"][0] == [[[2, 2], [3, 2], [3, 3], [2, 2]]]
     assert corpo["custom_model"]["priority"] == [
         {"if": "in_area0", "multiply_by": "0"},
         {"if": "in_area1", "multiply_by": "0"},

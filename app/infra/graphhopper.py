@@ -20,6 +20,18 @@ def _anel(pontos: Sequence[Coordenada]) -> list[list[float]]:
     return coordenadas if coordenadas[0] == coordenadas[-1] else [*coordenadas, coordenadas[0]]
 
 
+# O GraphHopper só testa uma via contra a área se o retângulo das duas pontas da via cruzar o
+# retângulo da área. Uma via longa que entra na área numa curva, com as pontas do lado de fora,
+# escapava e era usada (conjunto D16, nível 3, 2026-10-31: uma via de 2,97 km atravessando 537 m de
+# uma área). Dois triângulos minúsculos a mais de 100 km de São Leopoldo e Novo Hamburgo, onde o
+# grafo não tem via, alargam o retângulo da área para o recorte inteiro: toda via passa pelo teste
+# exato, e o que é proibido não muda. Custo medido: de 38 para 51 ms na rota do caso.
+_FORA_DO_RECORTE = (
+    [[[-52.5, -31.0], [-52.499, -31.0], [-52.5, -30.999], [-52.5, -31.0]]],
+    [[[-49.5, -28.5], [-49.499, -28.5], [-49.5, -28.499], [-49.5, -28.5]]],
+)
+
+
 def modelo_com_exclusoes(exclusoes: Sequence[Poligono]) -> dict[str, Any]:
     """custom_model da restrita: uma feature por polígono, prioridade 0 em cada (RN03, DAS 6.4)."""
     features = [
@@ -28,8 +40,11 @@ def modelo_com_exclusoes(exclusoes: Sequence[Poligono]) -> dict[str, Any]:
             "id": f"area{i}",
             "properties": {},
             "geometry": {
-                "type": "Polygon",
-                "coordinates": [_anel(p.exterior), *(_anel(b) for b in p.buracos)],
+                "type": "MultiPolygon",
+                "coordinates": [
+                    [_anel(p.exterior), *(_anel(b) for b in p.buracos)],
+                    *_FORA_DO_RECORTE,
+                ],
             },
         }
         for i, p in enumerate(exclusoes)
