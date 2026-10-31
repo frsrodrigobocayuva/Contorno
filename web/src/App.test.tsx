@@ -2,28 +2,74 @@ import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
 
-// O MapLibre precisa de WebGL, que o jsdom não tem: no lugar dele, botões que "tocam no mapa"
-// e dão o duplo clique do mouse (este só quando o App passa quem cancela).
-vi.mock('./mapa/Mapa', () => ({
-  Mapa: ({
-    aoTocar,
-    aoCancelar,
-  }: {
-    aoTocar?: (coordenadas: [number, number]) => void
-    aoCancelar?: () => void
-  }) => (
-    <>
-      <button type="button" onClick={() => aoTocar?.([-51.15, -29.79])}>
-        tocar no mapa
-      </button>
-      {aoCancelar && (
-        <button type="button" onClick={aoCancelar}>
-          duplo clique no mapa
-        </button>
-      )}
-    </>
-  ),
+// O MapLibre precisa de WebGL, que o jsdom não tem: no lugar dele, botões que "tocam no mapa",
+// dão o duplo clique do mouse (só quando o App passa quem cancela) e desenham uma área.
+const { VERTICES } = vi.hoisted(() => ({
+  VERTICES: [
+    [-51.15, -29.76],
+    [-51.14, -29.76],
+    [-51.14, -29.75],
+  ] as [number, number][],
 }))
+vi.mock('./mapa/Mapa', async () => {
+  const { useImperativeHandle } = await import('react')
+  return {
+    Mapa: ({
+      aoTocar,
+      aoCancelar,
+      desenho,
+      aoMudarDesenho,
+      aoFecharDesenho,
+      ref,
+    }: {
+      aoTocar?: (coordenadas: [number, number]) => void
+      aoCancelar?: () => void
+      desenho?: object | null
+      aoMudarDesenho?: (estado: {
+        vertices: [number, number][]
+        podeDesfazer: boolean
+      }) => void
+      aoFecharDesenho?: (vertices: [number, number][]) => void
+      ref?: import('react').Ref<{
+        desfazer: () => void
+        vertices: () => [number, number][]
+      }>
+    }) => {
+      useImperativeHandle(
+        ref,
+        () => ({ desfazer: () => {}, vertices: () => VERTICES }),
+        [],
+      )
+      return (
+        <>
+          <button type="button" onClick={() => aoTocar?.([-51.15, -29.79])}>
+            tocar no mapa
+          </button>
+          {aoCancelar && (
+            <button type="button" onClick={aoCancelar}>
+              duplo clique no mapa
+            </button>
+          )}
+          {desenho && (
+            <>
+              <button
+                type="button"
+                onClick={() =>
+                  aoMudarDesenho?.({ vertices: VERTICES, podeDesfazer: true })
+                }
+              >
+                marcar cantos
+              </button>
+              <button type="button" onClick={() => aoFecharDesenho?.(VERTICES)}>
+                fechar desenho
+              </button>
+            </>
+          )}
+        </>
+      )
+    },
+  }
+})
 
 type Tratador = (opcoes?: RequestInit) => Response
 
@@ -169,7 +215,7 @@ describe('App', () => {
     expect(calcular).toBeEnabled()
   })
 
-  it('calcula e mostra a rota normal, com as restrições em breve', async () => {
+  it('calcula e mostra a rota normal, com o raio e as classes em breve', async () => {
     const fetch = api([[/^\/rotas\/calculo$/, () => json(ROTA)]])
     comecar()
     marcarOrigemEDestino()
@@ -178,8 +224,8 @@ describe('App', () => {
 
     expect(await screen.findByText('13 min · 12,8 km')).toBeInTheDocument()
     expect(screen.getByText('nenhuma restrição')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Desenhar área/ })).toBeDisabled()
-    expect(screen.getAllByText('em breve')).toHaveLength(3)
+    expect(screen.getByRole('button', { name: /Desenhar área/ })).toBeEnabled()
+    expect(screen.getAllByText('em breve')).toHaveLength(2)
     const corpo = JSON.parse(fetch.mock.calls[0][1]!.body as string)
     expect(corpo).toEqual({
       origem: [-51.15, -29.79],
@@ -367,6 +413,209 @@ describe('App', () => {
 
       expect(screen.queryByText('13 min · 12,8 km')).not.toBeInTheDocument()
       deveEstarVazio()
+    })
+  })
+
+  describe('áreas proibidas', () => {
+    const CONTORNO = {
+      type: 'MultiPolygon',
+      coordinates: [[[...VERTICES, VERTICES[0]]]],
+    }
+    const AREA = {
+      celulas: ['8ba8b4b2c9a5fff'],
+      contorno: CONTORNO,
+      areaDesenhadaM2: 910_000,
+      areaProibidaM2: 1_092_000,
+      conflitos: [] as string[],
+    }
+    const RESTRITA = {
+      ...ROTA,
+      restrita: {
+        ...ROTA.irrestrita,
+        duracaoSegundos: 786 + 360,
+        distanciaMetros: 12_799 + 1_800,
+      },
+    }
+
+    type Corpo = { restricoes?: { id: string; rotulo: string }[] }
+    const corpo = (opcoes?: RequestInit) =>
+      JSON.parse(opcoes!.body as string) as Corpo
+
+    async function ateODesenho(rotas: [RegExp, Tratador][]) {
+      const fetch = api(rotas)
+      comecar()
+      marcarOrigemEDestino()
+      fireEvent.click(screen.getByRole('button', { name: 'Calcular rota' }))
+      fireEvent.click(
+        await screen.findByRole('button', { name: /Desenhar área/ }),
+      )
+      fireEvent.click(screen.getByRole('button', { name: 'marcar cantos' }))
+      return fetch
+    }
+
+    it('desenha, confere o contorno e recebe a rota restrita com o custo', async () => {
+      const fetch = await ateODesenho([
+        [/^\/restricoes\/area$/, () => json(AREA)],
+        [
+          /^\/rotas\/calculo$/,
+          (opcoes) => json(corpo(opcoes).restricoes?.length ? RESTRITA : ROTA),
+        ],
+      ])
+      expect(screen.getByText('Desenhar área proibida')).toBeInTheDocument()
+      expect(screen.getByText('3 pontos marcados')).toBeInTheDocument()
+
+      fireEvent.click(screen.getByRole('button', { name: 'Concluir área' }))
+
+      expect(
+        await screen.findByText('Confira a área proibida'),
+      ).toBeInTheDocument()
+      expect(screen.getByText(/20% maior/)).toBeInTheDocument()
+      const pedidoDaArea = JSON.parse(
+        fetch.mock.calls.find(([url]) => url === '/restricoes/area')![1]!
+          .body as string,
+      )
+      expect(pedidoDaArea).toEqual({
+        poligono: VERTICES,
+        origem: [-51.15, -29.79],
+        destino: [-51.15, -29.79],
+      })
+      const nome = screen.getByLabelText('Nome da área (opcional)')
+      expect(nome).toHaveAttribute('placeholder', 'Área 1')
+      fireEvent.change(nome, { target: { value: 'Centro' } })
+
+      fireEvent.click(
+        screen.getByRole('button', { name: 'Confirmar e recalcular' }),
+      )
+
+      expect(await screen.findByText('Custo da restrição')).toBeInTheDocument()
+      expect(screen.getByText('+6 min · +1,8 km')).toBeInTheDocument()
+      expect(screen.getByText('1 restrição aplicada')).toBeInTheDocument()
+      expect(corpo(fetch.mock.calls.at(-1)![1]).restricoes).toEqual([
+        expect.objectContaining({
+          tipo: 'AREA',
+          rotulo: 'Centro',
+          celulas: AREA.celulas,
+        }),
+      ])
+    })
+
+    it('área que cobre o destino avisa e volta ao desenho para ajustar', async () => {
+      await ateODesenho([
+        [
+          /^\/restricoes\/area$/,
+          () => json({ ...AREA, conflitos: ['DESTINO'] }),
+        ],
+        [/^\/rotas\/calculo$/, () => json(ROTA)],
+      ])
+
+      fireEvent.click(screen.getByRole('button', { name: 'fechar desenho' }))
+
+      expect(
+        await screen.findByText('A área cobre o destino'),
+      ).toBeInTheDocument()
+      expect(
+        screen.queryByRole('button', { name: 'Confirmar e recalcular' }),
+      ).not.toBeInTheDocument()
+      fireEvent.click(screen.getByRole('button', { name: 'Ajustar a área' }))
+      expect(screen.getByText('Desenhar área proibida')).toBeInTheDocument()
+    })
+
+    it('quando as áreas bloqueiam, avisa e leva às restrições para remover', async () => {
+      const fetch = await ateODesenho([
+        [/^\/restricoes\/area$/, () => json(AREA)],
+        [
+          /^\/rotas\/calculo$/,
+          (opcoes) =>
+            corpo(opcoes).restricoes?.length
+              ? json({
+                  tipo: 'DIAGNOSTICO',
+                  causa: 'AREAS_BLOQUEIAM',
+                  candidatas: [],
+                  mensagem: 'Não existe caminho que respeite as áreas.',
+                })
+              : json(ROTA),
+        ],
+      ])
+      fireEvent.click(screen.getByRole('button', { name: 'Concluir área' }))
+      fireEvent.click(
+        await screen.findByRole('button', { name: 'Confirmar e recalcular' }),
+      )
+
+      expect(
+        await screen.findByText('Nenhum caminho respeita as áreas'),
+      ).toBeInTheDocument()
+      fireEvent.click(screen.getByRole('button', { name: 'Ver restrições' }))
+      expect(screen.getByText('Áreas proibidas (1)')).toBeInTheDocument()
+
+      fireEvent.click(screen.getByRole('button', { name: 'Remover Área 1' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Recalcular rota' }))
+
+      expect(await screen.findByText('nenhuma restrição')).toBeInTheDocument()
+      expect(corpo(fetch.mock.calls.at(-1)![1]).restricoes).toEqual([])
+    })
+
+    it('com a origem dentro de uma área, o cálculo avisa qual área', async () => {
+      await ateODesenho([
+        [/^\/restricoes\/area$/, () => json(AREA)],
+        [
+          /^\/rotas\/calculo$/,
+          (opcoes) => {
+            const [area] = corpo(opcoes).restricoes ?? []
+            return area
+              ? json(
+                  {
+                    codigo: 'AREA_CONTEM_EXTREMO',
+                    mensagem: 'x',
+                    detalhes: [{ area: area.id, extremo: 'ORIGEM' }],
+                  },
+                  422,
+                )
+              : json(ROTA)
+          },
+        ],
+      ])
+      fireEvent.click(screen.getByRole('button', { name: 'Concluir área' }))
+      fireEvent.click(
+        await screen.findByRole('button', { name: 'Confirmar e recalcular' }),
+      )
+
+      expect(
+        await screen.findByText('A origem está dentro de Área 1'),
+      ).toBeInTheDocument()
+    })
+
+    it('desenho que se cruza é recusado com aviso, sem sair do desenho', async () => {
+      await ateODesenho([
+        [
+          /^\/restricoes\/area$/,
+          () =>
+            json(
+              {
+                codigo: 'VALIDACAO',
+                mensagem: 'x',
+                detalhes: [{ campo: 'poligono', motivo: 'POLIGONO_INVALIDO' }],
+              },
+              422,
+            ),
+        ],
+        [/^\/rotas\/calculo$/, () => json(ROTA)],
+      ])
+
+      fireEvent.click(screen.getByRole('button', { name: 'Concluir área' }))
+
+      expect(await screen.findByText(/O desenho se cruza/)).toBeInTheDocument()
+      expect(screen.getByText('Desenhar área proibida')).toBeInTheDocument()
+    })
+
+    it('o Esc no desenho desiste só da área, sem cancelar a rota', async () => {
+      await ateODesenho([[/^\/rotas\/calculo$/, () => json(ROTA)]])
+
+      fireEvent.keyDown(window, { key: 'Escape' })
+
+      expect(screen.getByText('nenhuma restrição')).toBeInTheDocument()
+      expect(
+        screen.queryByText('Desenhar área proibida'),
+      ).not.toBeInTheDocument()
     })
   })
 })

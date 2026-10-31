@@ -1,24 +1,47 @@
 // O estado de uma consulta fica num ponto só, aqui, e desce para os componentes (DAS 7.2).
-// Telas do protótipo aprovado: 01/14 abertura, 02 origem e destino, 03 rota normal, 13 avisos.
+// Telas do protótipo aprovado: 01/14 abertura, 02 origem e destino, 03 rota normal, 04 desenhar
+// área, 05 contorno das células, 06 rota restrita e custo, 07 restrições, 10 conflito, 13 avisos.
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   calcularRota,
+  definirArea,
   ErroDaApi,
   type Coordenadas,
+  type RespostaArea,
   type Rota,
 } from './api/cliente'
 import { Aviso } from './Aviso'
 import { PainelDaRota } from './comparacao/PainelDaRota'
 import { CampoDeEndereco } from './mapa/CampoDeEndereco'
-import { Mapa } from './mapa/Mapa'
+import { Mapa, type AreaNoMapa, type ControleDoMapa } from './mapa/Mapa'
 import { PONTO_NO_MAPA, type Campo, type Ponto } from './pontos'
+import {
+  novaArea,
+  paraRestricoes,
+  rotuloPadrao,
+  type AreaDeclarada,
+} from './restricoes/areas'
+import type { EstadoDoDesenho } from './restricoes/editor'
+import { ListaDeRestricoes } from './restricoes/ListaDeRestricoes'
+import {
+  PainelDaConferencia,
+  PainelDoDesenho,
+} from './restricoes/PaineisDaArea'
 
-type Etapa = 'abertura' | 'pontos' | 'rota'
+type Etapa =
+  'abertura' | 'pontos' | 'rota' | 'desenhar' | 'conferir' | 'restricoes'
 
 interface AvisoDaRota {
   titulo: string
   texto: string
   tentarDeNovo?: boolean
+  verRestricoes?: boolean
+}
+
+interface Conferencia {
+  desenho: Coordenadas[]
+  resposta: RespostaArea
+  editando?: string
 }
 
 const FORA_DA_REGIAO: AvisoDaRota = {
@@ -34,7 +57,20 @@ const MOTOR_FORA_DO_AR: AvisoDaRota = {
   tentarDeNovo: true,
 }
 
-function avisoDoErro(erro: unknown): AvisoDaRota {
+const SEM_DESENHO: EstadoDoDesenho = { vertices: [], podeDesfazer: false }
+
+function avisoDoErro(erro: unknown, areas: AreaDeclarada[]): AvisoDaRota {
+  if (erro instanceof ErroDaApi && erro.codigo === 'AREA_CONTEM_EXTREMO') {
+    const [conflito] = erro.detalhes
+    const area = areas.find((a) => a.id === conflito?.area)
+    const ponto = conflito?.extremo === 'ORIGEM' ? 'A origem' : 'O destino'
+    return {
+      titulo: `${ponto} está dentro de ${area?.rotulo ?? 'uma área'}`,
+      texto:
+        'A rota não pode sair nem chegar dentro de uma área proibida. Redesenhe ou remova a área, ou mude o ponto.',
+      verRestricoes: true,
+    }
+  }
   if (erro instanceof ErroDaApi && erro.temMotivo('FORA_DA_REGIAO'))
     return FORA_DA_REGIAO
   if (
@@ -50,37 +86,76 @@ function avisoDoErro(erro: unknown): AvisoDaRota {
   }
 }
 
+function erroDoDesenho(erro: unknown): string {
+  if (erro instanceof ErroDaApi && erro.temMotivo('POLIGONO_INVALIDO'))
+    return 'O desenho se cruza ou tem pontos repetidos. Desfaça alguns pontos e marque de novo.'
+  if (erro instanceof ErroDaApi && erro.temMotivo('FORA_DA_REGIAO'))
+    return 'A área passa de São Leopoldo e Novo Hamburgo. Marque os cantos dentro da região atendida.'
+  return 'Não foi possível conferir a área agora. Tente de novo.'
+}
+
 function App() {
   const [etapa, setEtapa] = useState<Etapa>('abertura')
   const [campoAtivo, setCampoAtivo] = useState<Campo>('origem')
   const [origem, setOrigem] = useState<Ponto | null>(null)
   const [destino, setDestino] = useState<Ponto | null>(null)
   const [rota, setRota] = useState<Rota | null>(null)
+  const [restrita, setRestrita] = useState<Rota | null>(null)
+  const [areas, setAreas] = useState<AreaDeclarada[]>([])
+  const [desenho, setDesenho] = useState<{
+    inicial?: Coordenadas[]
+    editando?: string
+  } | null>(null)
+  const [estadoDoDesenho, setEstadoDoDesenho] =
+    useState<EstadoDoDesenho>(SEM_DESENHO)
+  const [erroDoDesenhoAtual, setErroDoDesenhoAtual] = useState<string | null>(
+    null,
+  )
+  const [conferindo, setConferindo] = useState(false)
+  const [conferencia, setConferencia] = useState<Conferencia | null>(null)
+  const [nome, setNome] = useState('')
   const [aviso, setAviso] = useState<AvisoDaRota | null>(null)
   const [calculando, setCalculando] = useState(false)
+  const mapa = useRef<ControleDoMapa>(null)
   // Cada cancelamento muda a consulta; a resposta de um cálculo de antes dele é descartada.
   const consulta = useRef(0)
 
-  // Cancelar apaga tudo e volta para origem e destino vazios (plano, 2026-10-29).
+  // Cancelar apaga tudo, inclusive as áreas, e volta para origem e destino vazios
+  // (plano, 2026-10-29).
   const cancelar = useCallback(() => {
     consulta.current += 1
     setOrigem(null)
     setDestino(null)
     setRota(null)
+    setRestrita(null)
+    setAreas([])
+    setDesenho(null)
+    setConferencia(null)
     setAviso(null)
     setCalculando(false)
     setCampoAtivo('origem')
     setEtapa('pontos')
   }, [])
 
+  // Sair do desenho ou da conferência sem aplicar a área.
+  const sairDaArea = useCallback(() => {
+    setDesenho(null)
+    setConferencia(null)
+    setErroDoDesenhoAtual(null)
+    setEtapa('rota')
+  }, [])
+
+  // No desenho e na conferência, o Esc desiste só da área; nas outras telas, cancela a rota.
   useEffect(() => {
     if (etapa === 'abertura') return
     function aoTeclar(evento: KeyboardEvent) {
-      if (evento.key === 'Escape') cancelar()
+      if (evento.key !== 'Escape') return
+      if (etapa === 'desenhar' || etapa === 'conferir') sairDaArea()
+      else cancelar()
     }
     window.addEventListener('keydown', aoTeclar)
     return () => window.removeEventListener('keydown', aoTeclar)
-  }, [etapa, cancelar])
+  }, [etapa, cancelar, sairDaArea])
 
   function marcar(campo: Campo, ponto: Ponto) {
     if (campo === 'origem') {
@@ -90,6 +165,7 @@ function App() {
       setDestino(ponto)
     }
     setRota(null)
+    setRestrita(null)
     setAviso(null)
   }
 
@@ -98,7 +174,7 @@ function App() {
       marcar(campoAtivo, { nome: PONTO_NO_MAPA, coordenadas })
   }
 
-  async function calcular() {
+  async function calcular(comAreas: AreaDeclarada[] = areas) {
     if (!origem || !destino) return
     const esta = consulta.current
     setCalculando(true)
@@ -107,10 +183,21 @@ function App() {
       const resposta = await calcularRota(
         origem.coordenadas,
         destino.coordenadas,
+        paraRestricoes(comAreas),
       )
       if (esta !== consulta.current) return
       if (resposta.tipo === 'ROTAS') {
         setRota(resposta.irrestrita)
+        setRestrita(resposta.restrita ?? null)
+        setEtapa('rota')
+      } else if (resposta.causa === 'AREAS_BLOQUEIAM') {
+        // Aviso provisório até o diagnóstico do S5-03 (plano, 2026-10-30).
+        setRestrita(null)
+        setAviso({
+          titulo: 'Nenhum caminho respeita as áreas',
+          texto: resposta.mensagem,
+          verRestricoes: true,
+        })
         setEtapa('rota')
       } else {
         setAviso({
@@ -119,11 +206,98 @@ function App() {
         })
       }
     } catch (erro) {
-      if (esta === consulta.current) setAviso(avisoDoErro(erro))
+      if (esta === consulta.current) setAviso(avisoDoErro(erro, comAreas))
     } finally {
       if (esta === consulta.current) setCalculando(false)
     }
   }
+
+  function desenharArea(editando?: AreaDeclarada) {
+    setDesenho(
+      editando ? { inicial: editando.desenho, editando: editando.id } : {},
+    )
+    setEstadoDoDesenho(SEM_DESENHO)
+    setErroDoDesenhoAtual(null)
+    setAviso(null)
+    setEtapa('desenhar')
+  }
+
+  async function conferir(vertices: Coordenadas[]) {
+    if (vertices.length < 3 || conferindo) return
+    setConferindo(true)
+    setErroDoDesenhoAtual(null)
+    try {
+      const resposta = await definirArea(
+        vertices,
+        origem?.coordenadas,
+        destino?.coordenadas,
+      )
+      const editada = areas.find((a) => a.id === desenho?.editando)
+      setConferencia({ desenho: vertices, resposta, editando: editada?.id })
+      setNome(
+        editada && !editada.rotulo.startsWith('Área ') ? editada.rotulo : '',
+      )
+      setDesenho(null)
+      setEtapa('conferir')
+    } catch (erro) {
+      setErroDoDesenhoAtual(erroDoDesenho(erro))
+    } finally {
+      setConferindo(false)
+    }
+  }
+
+  const outrasAreas = areas.filter((a) => a.id !== conferencia?.editando)
+
+  function confirmarArea() {
+    if (!conferencia) return
+    const id = conferencia.editando ?? crypto.randomUUID()
+    const area = novaArea(
+      id,
+      nome,
+      rotuloPadrao(outrasAreas),
+      conferencia.desenho,
+      conferencia.resposta,
+    )
+    const lista = conferencia.editando
+      ? areas.map((a) => (a.id === id ? area : a))
+      : [...areas, area]
+    setAreas(lista)
+    setConferencia(null)
+    // O resultado, ou o aviso, aparece na tela da rota.
+    setRestrita(null)
+    setEtapa('rota')
+    void calcular(lista)
+  }
+
+  function ajustarArea() {
+    if (!conferencia) return
+    setDesenho({
+      inicial: conferencia.desenho,
+      editando: conferencia.editando,
+    })
+    setConferencia(null)
+    setEstadoDoDesenho(SEM_DESENHO)
+    setEtapa('desenhar')
+  }
+
+  function removerArea(id: string) {
+    setAreas((atuais) => atuais.filter((a) => a.id !== id))
+    setRestrita(null)
+  }
+
+  // O mapa mostra as áreas da consulta; no desenho e na conferência de uma área já aplicada, a
+  // versão antiga sai de cena, e a nova aparece só depois de conferida.
+  const editando = desenho?.editando ?? conferencia?.editando
+  const areasNoMapa: AreaNoMapa[] = areas
+    .filter((a) => a.id !== editando)
+    .map(({ id, contorno }) => ({ id, contorno }))
+  if (conferencia && !conferencia.resposta.conflitos.length) {
+    areasNoMapa.push({
+      id: 'em-conferencia',
+      contorno: conferencia.resposta.contorno,
+    })
+  }
+  const comRota = etapa !== 'abertura' && etapa !== 'pontos'
 
   return (
     <div className={etapa === 'abertura' ? 'app app-abertura' : 'app'}>
@@ -151,6 +325,30 @@ function App() {
           </button>
         </header>
       )}
+      {(etapa === 'desenhar' || etapa === 'conferir') && (
+        <header className="topo">
+          <span className="topo-titulo">
+            {etapa === 'desenhar'
+              ? 'Desenhar área proibida'
+              : 'Confira a área proibida'}
+          </span>
+          <button type="button" className="acao-topo" onClick={sairDaArea}>
+            {etapa === 'desenhar' ? 'Cancelar' : 'Descartar'}
+          </button>
+        </header>
+      )}
+      {etapa === 'restricoes' && (
+        <header className="topo">
+          <button
+            type="button"
+            className="voltar voltar-texto"
+            onClick={() => setEtapa('rota')}
+          >
+            ‹ Rota
+          </button>
+          <span className="topo-titulo topo-centro">Restrições</span>
+        </header>
+      )}
       {etapa === 'pontos' && (
         <section className="campos" aria-label="Origem e destino">
           <CampoDeEndereco
@@ -176,12 +374,35 @@ function App() {
           </p>
         </section>
       )}
+      {etapa === 'desenhar' && (
+        <p className="campos faixa-dica">
+          Toque no mapa para marcar cada canto da área. Toque no primeiro ponto
+          para fechar.
+        </p>
+      )}
       <Mapa
+        ref={mapa}
         origem={origem?.coordenadas}
         destino={destino?.coordenadas}
-        rota={etapa === 'rota' ? rota?.geometria.coordinates : null}
+        rota={comRota ? rota?.geometria.coordinates : null}
+        rotaRestrita={
+          etapa === 'rota' || etapa === 'restricoes'
+            ? restrita?.geometria.coordinates
+            : null
+        }
+        areas={areasNoMapa}
+        referencia={
+          conferencia ? [...conferencia.desenho, conferencia.desenho[0]] : null
+        }
+        desenho={etapa === 'desenhar' ? desenho : null}
+        aoMudarDesenho={setEstadoDoDesenho}
+        aoFecharDesenho={(vertices) => void conferir(vertices)}
         aoTocar={tocarNoMapa}
-        aoCancelar={etapa === 'abertura' ? undefined : cancelar}
+        aoCancelar={
+          etapa === 'pontos' || etapa === 'rota' || etapa === 'restricoes'
+            ? cancelar
+            : undefined
+        }
       />
       {etapa === 'abertura' && (
         <>
@@ -195,19 +416,23 @@ function App() {
           </button>
         </>
       )}
-      {etapa === 'pontos' && (
+      {(etapa === 'pontos' || etapa === 'rota') && (
         <section className="base">
           {aviso && (
             <Aviso
               titulo={aviso.titulo}
               acao={
-                aviso.tentarDeNovo && (
+                (aviso.tentarDeNovo || aviso.verRestricoes) && (
                   <button
                     type="button"
                     className="botao"
-                    onClick={() => void calcular()}
+                    onClick={() =>
+                      aviso.verRestricoes
+                        ? setEtapa('restricoes')
+                        : void calcular()
+                    }
                   >
-                    Tentar de novo
+                    {aviso.verRestricoes ? 'Ver restrições' : 'Tentar de novo'}
                   </button>
                 )
               }
@@ -215,15 +440,26 @@ function App() {
               {aviso.texto}
             </Aviso>
           )}
-          <button
-            type="button"
-            className="botao-principal"
-            disabled={!origem || !destino || calculando}
-            onClick={() => void calcular()}
-          >
-            {calculando ? 'Calculando…' : 'Calcular rota'}
-          </button>
-          {(origem || destino) && (
+          {etapa === 'pontos' && (
+            <button
+              type="button"
+              className="botao-principal"
+              disabled={!origem || !destino || calculando}
+              onClick={() => void calcular()}
+            >
+              {calculando ? 'Calculando…' : 'Calcular rota'}
+            </button>
+          )}
+          {etapa === 'rota' && rota && (
+            <PainelDaRota
+              rota={rota}
+              restrita={restrita}
+              quantasRestricoes={areas.length}
+              aoDesenharArea={() => desenharArea()}
+              aoVerRestricoes={() => setEtapa('restricoes')}
+            />
+          )}
+          {(etapa === 'rota' || origem || destino) && (
             <>
               <button type="button" className="botao" onClick={cancelar}>
                 Cancelar rota
@@ -235,15 +471,48 @@ function App() {
           )}
         </section>
       )}
-      {etapa === 'rota' && rota && (
+      {etapa === 'desenhar' && (
         <section className="base">
-          <PainelDaRota rota={rota} />
-          <button type="button" className="botao" onClick={cancelar}>
-            Cancelar rota
-          </button>
-          <p className="dica atalhos">
-            Esc ou duplo clique no mapa também cancelam a rota.
-          </p>
+          <PainelDoDesenho
+            vertices={estadoDoDesenho.vertices}
+            podeDesfazer={estadoDoDesenho.podeDesfazer}
+            conferindo={conferindo}
+            erro={erroDoDesenhoAtual}
+            aoDesfazer={() => mapa.current?.desfazer()}
+            aoConcluir={() => void conferir(mapa.current?.vertices() ?? [])}
+          />
+        </section>
+      )}
+      {etapa === 'conferir' && conferencia && (
+        <section className="base">
+          <PainelDaConferencia
+            resposta={conferencia.resposta}
+            nome={nome}
+            rotuloSemNome={rotuloPadrao(outrasAreas)}
+            calculando={calculando}
+            aoMudarNome={setNome}
+            aoAjustar={ajustarArea}
+            aoConfirmar={confirmarArea}
+            aoMudarPonto={() => {
+              setConferencia(null)
+              setEtapa('pontos')
+            }}
+          />
+        </section>
+      )}
+      {etapa === 'restricoes' && (
+        <section className="base">
+          <ListaDeRestricoes
+            areas={areas}
+            calculando={calculando}
+            aoRedesenhar={(id) => desenharArea(areas.find((a) => a.id === id))}
+            aoRemover={removerArea}
+            aoNovaRestricao={() => desenharArea()}
+            aoRecalcular={() => {
+              setEtapa('rota')
+              void calcular()
+            }}
+          />
         </section>
       )}
     </div>

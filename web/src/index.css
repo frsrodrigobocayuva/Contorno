@@ -343,3 +343,113 @@ input {
   font-weight: 600;
   border: 2px solid #ffffff;
 }
+
+/* Título e ação do topo no desenho, na conferência e nas restrições (telas 04, 05 e 07). */
+.topo-titulo {
+  font-weight: 600;
+  font-size: 16px;
+}
+
+.topo-centro {
+  margin: 0 auto;
+  padding-right: 56px;
+}
+
+.acao-topo {
+  margin-left: auto;
+  min-height: 44px;
+  padding: 0 8px;
+  border: 0;
+  border-bottom: 1.5px solid var(--tinta);
+  background: none;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+/* Faixa de dica do desenho e das restrições (telas 04 e 07). */
+.faixa-dica {
+  margin: 0;
+  padding: 12px 16px;
+  background: var(--fundo-suave);
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.linha-botoes {
+  display: flex;
+  gap: 8px;
+}
+
+.linha-botoes > * {
+  flex: 1;
+}
+
+.linha-informacoes {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--tinta-suave);
+}
+
+.quadro {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--borda-forte);
+  border-radius: 4px;
+}
+
+.quadro p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.quadro .linha-informacoes {
+  font-size: 14px;
+  color: var(--tinta);
+}
+
+.valor-custo {
+  font-size: 26px;
+  letter-spacing: -0.01em;
+}
+
+/* Legenda das rotas (tela 06): o mesmo traço do mapa ao lado de cada valor. */
+.legenda {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  font-size: 14px;
+}
+
+.legenda li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.lista-restricoes {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.lista-restricoes h2 {
+  margin: 0;
+}
+
+.lista-restricoes ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}

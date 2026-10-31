@@ -8,7 +8,7 @@
     "/rotas/calculo": {
       "post": {
         "summary": "Calcular",
-        "description": "A rota irrestrita entre origem e destino; sem caminho, o diagnóstico (D6).",
+        "description": "A irrestrita e, com áreas, a restrita validada; sem caminho, o diagnóstico (D6).",
         "operationId": "calcular_rotas_calculo_post",
         "requestBody": {
           "content": {
@@ -58,6 +58,45 @@
           },
           "503": {
             "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/restricoes/area": {
+      "post": {
+        "summary": "Definir Area",
+        "description": "As células da área, o contorno delas e os conflitos com a origem e o destino (UC02).\n\nRecusa, antes do domínio (DAS 6.10), desenho fora de São Leopoldo e Novo Hamburgo, com menos\nde três vértices distintos ou que se cruza.",
+        "operationId": "definir_area_restricoes_area_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PedidoDeArea"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RespostaArea"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Content",
             "content": {
               "application/json": {
                 "schema": {
@@ -135,7 +174,8 @@
         "enum": [
           "DESTINO_INALCANCAVEL",
           "RESTRICAO_UNICA",
-          "COMBINACAO_DE_RESTRICOES"
+          "COMBINACAO_DE_RESTRICOES",
+          "AREAS_BLOQUEIAM"
         ],
         "title": "CausaDeInviabilidade"
       },
@@ -175,6 +215,14 @@
         ],
         "title": "Erro",
         "description": "Formato único de erro (DAS 6.9)."
+      },
+      "Extremo": {
+        "type": "string",
+        "enum": [
+          "ORIGEM",
+          "DESTINO"
+        ],
+        "title": "Extremo"
       },
       "LinhaGeoJSON": {
         "properties": {
@@ -254,6 +302,134 @@
         ],
         "title": "MotivoDeBuscaVazia"
       },
+      "MultiPoligonoGeoJSON": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "MultiPolygon",
+            "title": "Type",
+            "default": "MultiPolygon"
+          },
+          "coordinates": {
+            "items": {
+              "items": {
+                "items": {
+                  "prefixItems": [
+                    {
+                      "type": "number",
+                      "maximum": 180.0,
+                      "minimum": -180.0
+                    },
+                    {
+                      "type": "number",
+                      "maximum": 90.0,
+                      "minimum": -90.0
+                    }
+                  ],
+                  "type": "array",
+                  "maxItems": 2,
+                  "minItems": 2
+                },
+                "type": "array"
+              },
+              "type": "array"
+            },
+            "type": "array",
+            "title": "Coordinates"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "coordinates"
+        ],
+        "title": "MultiPoligonoGeoJSON"
+      },
+      "PedidoDeArea": {
+        "properties": {
+          "poligono": {
+            "items": {
+              "prefixItems": [
+                {
+                  "type": "number",
+                  "maximum": 180.0,
+                  "minimum": -180.0
+                },
+                {
+                  "type": "number",
+                  "maximum": 90.0,
+                  "minimum": -90.0
+                }
+              ],
+              "type": "array",
+              "maxItems": 2,
+              "minItems": 2
+            },
+            "type": "array",
+            "maxItems": 500,
+            "minItems": 3,
+            "title": "Poligono",
+            "description": "Vértices do desenho, em ordem, sem repetir o primeiro no fim."
+          },
+          "origem": {
+            "anyOf": [
+              {
+                "prefixItems": [
+                  {
+                    "type": "number",
+                    "maximum": 180.0,
+                    "minimum": -180.0
+                  },
+                  {
+                    "type": "number",
+                    "maximum": 90.0,
+                    "minimum": -90.0
+                  }
+                ],
+                "type": "array",
+                "maxItems": 2,
+                "minItems": 2
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Origem"
+          },
+          "destino": {
+            "anyOf": [
+              {
+                "prefixItems": [
+                  {
+                    "type": "number",
+                    "maximum": 180.0,
+                    "minimum": -180.0
+                  },
+                  {
+                    "type": "number",
+                    "maximum": 90.0,
+                    "minimum": -90.0
+                  }
+                ],
+                "type": "array",
+                "maxItems": 2,
+                "minItems": 2
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Destino"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "poligono"
+        ],
+        "title": "PedidoDeArea",
+        "description": "Desenho do usuário (UC02) e, se já escolhidos, a origem e o destino da consulta."
+      },
       "PedidoDeRota": {
         "properties": {
           "origem": {
@@ -294,13 +470,11 @@
           },
           "restricoes": {
             "items": {
-              "additionalProperties": true,
-              "type": "object"
+              "$ref": "#/components/schemas/RestricaoArea"
             },
             "type": "array",
-            "maxItems": 0,
             "title": "Restricoes",
-            "description": "Áreas e preferências de via; entram na Sprint 5, por ora só lista vazia."
+            "description": "Áreas declaradas; as preferências de via entram na S5-02."
           }
         },
         "additionalProperties": false,
@@ -310,6 +484,48 @@
           "destino"
         ],
         "title": "PedidoDeRota"
+      },
+      "RespostaArea": {
+        "properties": {
+          "celulas": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Celulas",
+            "description": "Células H3 compactadas, em hexadecimal (ADR-011)."
+          },
+          "contorno": {
+            "$ref": "#/components/schemas/MultiPoligonoGeoJSON"
+          },
+          "areaDesenhadaM2": {
+            "type": "number",
+            "title": "Areadesenhadam2"
+          },
+          "areaProibidaM2": {
+            "type": "number",
+            "title": "Areaproibidam2"
+          },
+          "conflitos": {
+            "items": {
+              "$ref": "#/components/schemas/Extremo"
+            },
+            "type": "array",
+            "title": "Conflitos",
+            "description": "Extremos que caem dentro da área (UC02, B)."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "celulas",
+          "contorno",
+          "areaDesenhadaM2",
+          "areaProibidaM2",
+          "conflitos"
+        ],
+        "title": "RespostaArea",
+        "description": "A área proibida para o usuário conferir (UC02; RN04)."
       },
       "RespostaDiagnostico": {
         "properties": {
@@ -399,6 +615,49 @@
           "irrestrita"
         ],
         "title": "RespostaRotas"
+      },
+      "RestricaoArea": {
+        "properties": {
+          "tipo": {
+            "type": "string",
+            "const": "AREA",
+            "title": "Tipo"
+          },
+          "id": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Id",
+            "description": "Gerado no cliente (plano, A8)."
+          },
+          "rotulo": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Rotulo",
+            "description": "O nome, ou \"Área N\"."
+          },
+          "celulas": {
+            "items": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{15,16}$"
+            },
+            "type": "array",
+            "maxItems": 20000,
+            "minItems": 1,
+            "title": "Celulas"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "tipo",
+          "id",
+          "rotulo",
+          "celulas"
+        ],
+        "title": "RestricaoArea",
+        "description": "Área declarada, com as células que o cliente recebeu em /restricoes/area (UC01, [2])."
       },
       "RotaDTO": {
         "properties": {
