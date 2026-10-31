@@ -8,10 +8,14 @@ class ErroDoDominio(Exception):
 
 
 class ExtremoDentroDaArea(ErroDoDominio):
-    """Origem ou destino dentro de uma área excluída; a API responde 422 AREA_CONTEM_EXTREMO."""
+    """Origem ou destino dentro de uma área excluída; a API responde 422 AREA_CONTEM_EXTREMO.
 
-    def __init__(self, areas: Sequence[str]) -> None:
-        self.areas = tuple(areas)
+    Cada conflito é o id da área e o extremo que ela contém (ORIGEM ou DESTINO).
+    """
+
+    def __init__(self, conflitos: Sequence[tuple[str, str]]) -> None:
+        self.conflitos = tuple(conflitos)
+        self.areas = tuple(dict.fromkeys(area for area, _ in self.conflitos))
         super().__init__(f"origem ou destino dentro da(s) área(s): {', '.join(self.areas)}")
 
 

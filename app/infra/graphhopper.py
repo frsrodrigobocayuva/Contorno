@@ -2,6 +2,7 @@
 
 import time
 from collections.abc import Sequence
+from typing import Any
 
 import httpx
 
@@ -13,6 +14,32 @@ from app.infra import medicao
 _SEM_ROTA = ("ConnectionNotFoundException", "PointNotFoundException")
 
 
+def _anel(pontos: Sequence[Coordenada]) -> list[list[float]]:
+    """Anel GeoJSON: [longitude, latitude], fechado no primeiro ponto."""
+    coordenadas = [[c.longitude, c.latitude] for c in pontos]
+    return coordenadas if coordenadas[0] == coordenadas[-1] else [*coordenadas, coordenadas[0]]
+
+
+def modelo_com_exclusoes(exclusoes: Sequence[Poligono]) -> dict[str, Any]:
+    """custom_model da restrita: uma feature por polígono, prioridade 0 em cada (RN03, DAS 6.4)."""
+    features = [
+        {
+            "type": "Feature",
+            "id": f"area{i}",
+            "properties": {},
+            "geometry": {
+                "type": "Polygon",
+                "coordinates": [_anel(p.exterior), *(_anel(b) for b in p.buracos)],
+            },
+        }
+        for i, p in enumerate(exclusoes)
+    ]
+    return {
+        "areas": {"type": "FeatureCollection", "features": features},
+        "priority": [{"if": f"in_area{i}", "multiply_by": "0"} for i in range(len(exclusoes))],
+    }
+
+
 class AdaptadorGraphHopper:
     def __init__(self, cliente: httpx.AsyncClient, url: str, tempo_maximo_s: float) -> None:
         self._cliente = cliente
@@ -22,10 +49,10 @@ class AdaptadorGraphHopper:
     async def calcular(
         self, consulta: ConsultaDeRota, exclusoes: Sequence[Poligono], opcoes: OpcoesDeCusto
     ) -> Rota | None:
-        if exclusoes or opcoes.regras:
-            # Ignorar uma exclusão violaria a RN01: a rota restrita entra na S5-01.
-            raise NotImplementedError("rota restrita entra na S5-01")
-        corpo = {
+        if opcoes.regras:
+            # Ignorar uma preferência mudaria a rota sem avisar: as regras de via entram na S5-02.
+            raise NotImplementedError("preferências de via entram na S5-02")
+        corpo: dict[str, Any] = {
             "profile": "car",
             "points": [
                 [consulta.origem.longitude, consulta.origem.latitude],
@@ -33,6 +60,10 @@ class AdaptadorGraphHopper:
             ],
             "points_encoded": False,
         }
+        if exclusoes:
+            # Restrita: CH desligado, acelerada por LM (ADR-014), com as áreas no custom_model.
+            corpo["ch.disable"] = True
+            corpo["custom_model"] = modelo_com_exclusoes(exclusoes)
         inicio = time.perf_counter()
         try:
             resposta = await self._cliente.post(

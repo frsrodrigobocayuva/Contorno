@@ -12,6 +12,7 @@ from app.api.main import criar_app
 from app.api.registro import FormatoJSON
 from app.aplicacao.enderecos import LocalizadorDeEndereco
 from app.aplicacao.orquestrador import OrquestradorDeRota
+from app.aplicacao.restricoes import GestorDeRestricoes
 from app.dominio.excecoes import GeocodificadorIndisponivel, MotorIndisponivel
 from app.dominio.modelo import (
     CausaDeInviabilidade,
@@ -43,16 +44,24 @@ ROTA = Rota((Coordenada(*UNISINOS), Coordenada(*CENTRO_NH)), 1260, 12_800)
 
 
 class MotorFalso:
-    def __init__(self, rota: Rota | None = ROTA, erro: Exception | None = None) -> None:
+    """Devolve `restrita` quando há exclusões e `rota` quando não há."""
+
+    def __init__(
+        self,
+        rota: Rota | None = ROTA,
+        erro: Exception | None = None,
+        restrita: Rota | None = ROTA,
+    ) -> None:
         self.rota = rota
         self.erro = erro
+        self.restrita = restrita
 
     async def calcular(
         self, consulta: ConsultaDeRota, exclusoes: Sequence[Poligono], opcoes: OpcoesDeCusto
     ) -> Rota | None:
         if self.erro:
             raise self.erro
-        return self.rota
+        return self.restrita if exclusoes else self.rota
 
 
 class GeocodificadorFalso:
@@ -76,6 +85,7 @@ def api(
         httpx.AsyncClient(transport=httpx.MockTransport(graphhopper)),
         OrquestradorDeRota(motor or MotorFalso()),
         LocalizadorDeEndereco(geocodificador or GeocodificadorFalso()),
+        GestorDeRestricoes(11),
     )
     transporte = httpx.ASGITransport(app=criar_app(dependencias), raise_app_exceptions=False)
     return httpx.AsyncClient(transport=transporte, base_url="http://contorno")
@@ -134,7 +144,7 @@ async def test_ponto_fora_da_regiao_e_422() -> None:
     [
         (
             {"origem": UNISINOS, "destino": CENTRO_NH, "restricoes": [{"tipo": "AREA"}]},
-            "restricoes",
+            "restricoes.0.celulas",
         ),
         ({"origem": [200, 0], "destino": CENTRO_NH}, "origem.0"),
         ({"origem": UNISINOS}, "destino"),
@@ -260,3 +270,156 @@ async def test_cada_requisicao_vira_uma_linha_json_sem_o_texto_buscado(
     ]
     assert all({"momento", "ms_total", "ms_motor"} <= linha.keys() for linha in linhas)
     assert "minha casa" not in json.dumps(linhas)
+
+
+# Áreas (S5-01): POST /restricoes/area e o cálculo com áreas
+
+
+def quadrado(lon: float, lat: float, lado: float = 0.004) -> list[list[float]]:
+    return [[lon, lat], [lon + lado, lat], [lon + lado, lat + lado], [lon, lat + lado]]
+
+
+# A leste do caminho reto da UNISINOS ao centro de NH: a ROTA falsa não passa por ela.
+A_LESTE = quadrado(-51.120, -29.745)
+EM_VOLTA_DA_UNISINOS = quadrado(UNISINOS[0] - 0.002, UNISINOS[1] - 0.002)
+
+
+async def definir_area(cliente: httpx.AsyncClient, corpo: dict[str, object]) -> httpx.Response:
+    return await cliente.post("/restricoes/area", json=corpo)
+
+
+async def celulas(cliente: httpx.AsyncClient, poligono: list[list[float]]) -> list[str]:
+    resposta = await definir_area(cliente, {"poligono": poligono})
+    assert resposta.status_code == 200, resposta.text
+    lista: list[str] = resposta.json()["celulas"]
+    return lista
+
+
+def com_areas(*areas: tuple[str, list[str]]) -> dict[str, object]:
+    return {
+        "origem": UNISINOS,
+        "destino": CENTRO_NH,
+        "restricoes": [
+            {"tipo": "AREA", "id": id_, "rotulo": f"Área {i}", "celulas": celulas_}
+            for i, (id_, celulas_) in enumerate(areas, start=1)
+        ],
+    }
+
+
+async def test_area_desenhada_vira_celulas_e_contorno() -> None:
+    async with api() as cliente:
+        resposta = await definir_area(
+            cliente, {"poligono": A_LESTE, "origem": UNISINOS, "destino": CENTRO_NH}
+        )
+
+    assert resposta.status_code == 200
+    corpo = resposta.json()
+    assert corpo["celulas"] and all(len(c) in (15, 16) for c in corpo["celulas"])
+    anel = corpo["contorno"]["coordinates"][0][0]
+    assert corpo["contorno"]["type"] == "MultiPolygon"
+    assert anel[0] == anel[-1]
+    assert 0 < corpo["areaDesenhadaM2"] < corpo["areaProibidaM2"]
+    assert corpo["conflitos"] == []
+
+
+async def test_area_aponta_a_origem_dentro_dela() -> None:
+    async with api() as cliente:
+        resposta = await definir_area(
+            cliente, {"poligono": EM_VOLTA_DA_UNISINOS, "origem": UNISINOS, "destino": CENTRO_NH}
+        )
+
+    assert resposta.json()["conflitos"] == ["ORIGEM"]
+
+
+@pytest.mark.parametrize(
+    "corpo, campo, motivo",
+    [
+        (
+            {
+                "poligono": [
+                    [-51.150, -29.765],
+                    [-51.145, -29.760],
+                    [-51.145, -29.765],
+                    [-51.150, -29.760],
+                ]
+            },
+            "poligono",
+            "POLIGONO_INVALIDO",
+        ),
+        (
+            {"poligono": [[-51.150, -29.765], [-51.145, -29.765], [-51.150, -29.765]]},
+            "poligono",
+            "POLIGONO_INVALIDO",
+        ),
+        ({"poligono": quadrado(*PORTO_ALEGRE)}, "poligono", "FORA_DA_REGIAO"),
+        ({"poligono": A_LESTE, "origem": PORTO_ALEGRE}, "origem", "FORA_DA_REGIAO"),
+    ],
+)
+async def test_area_invalida_e_recusada(corpo: dict[str, object], campo: str, motivo: str) -> None:
+    async with api() as cliente:
+        resposta = await definir_area(cliente, corpo)
+
+    assert resposta.status_code == 422
+    assert resposta.json()["codigo"] == "VALIDACAO"
+    assert {"campo": campo, "motivo": motivo} in resposta.json()["detalhes"]
+
+
+async def test_area_com_menos_de_tres_vertices_fica_fora_do_esquema() -> None:
+    async with api() as cliente:
+        resposta = await definir_area(cliente, {"poligono": A_LESTE[:2]})
+
+    assert resposta.status_code == 422
+    assert resposta.json()["detalhes"][0]["campo"] == "poligono"
+
+
+async def test_rota_com_area_traz_a_restrita() -> None:
+    async with api() as cliente:
+        resposta = await calcular(cliente, com_areas(("a1", await celulas(cliente, A_LESTE))))
+
+    assert resposta.status_code == 200
+    corpo = resposta.json()
+    assert corpo["tipo"] == "ROTAS"
+    assert corpo["restrita"] == corpo["irrestrita"]
+
+
+async def test_extremo_dentro_de_area_e_422() -> None:
+    async with api() as cliente:
+        resposta = await calcular(
+            cliente, com_areas(("a1", await celulas(cliente, EM_VOLTA_DA_UNISINOS)))
+        )
+
+    assert resposta.status_code == 422
+    assert resposta.json()["codigo"] == "AREA_CONTEM_EXTREMO"
+    assert resposta.json()["detalhes"] == [{"area": "a1", "extremo": "ORIGEM"}]
+
+
+async def test_areas_que_bloqueiam_viram_o_aviso_provisorio() -> None:
+    async with api(MotorFalso(restrita=None)) as cliente:
+        resposta = await calcular(cliente, com_areas(("a1", await celulas(cliente, A_LESTE))))
+
+    assert resposta.status_code == 200
+    corpo = resposta.json()
+    assert (corpo["tipo"], corpo["causa"], corpo["candidatas"]) == (
+        "DIAGNOSTICO",
+        "AREAS_BLOQUEIAM",
+        [],
+    )
+    assert "Remova ou redesenhe" in corpo["mensagem"]
+
+
+@pytest.mark.parametrize(
+    "areas, motivo",
+    [
+        ((("a1", ["8b0000000000000"]),), "não é uma célula H3"),
+        ((("a1", ["8b0a8b6a5b2dfff"]), ("a1", ["8b0a8b6a5b2dfff"])), "ID_REPETIDO"),
+    ],
+)
+async def test_celulas_invalidas_sao_recusadas(
+    areas: tuple[tuple[str, list[str]], ...], motivo: str
+) -> None:
+    async with api() as cliente:
+        resposta = await calcular(cliente, com_areas(*areas))
+
+    assert resposta.status_code == 422
+    assert resposta.json()["codigo"] == "VALIDACAO"
+    assert motivo in resposta.json()["detalhes"][0]["motivo"]

@@ -10,13 +10,14 @@ from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.api import enderecos, rotas
+from app.api import enderecos, restricoes, rotas
 from app.api.config import Configuracao
 from app.api.dependencias import Dependencias, Deps
 from app.api.erros import registrar_tratadores
 from app.api.registro import configurar_log, registrar_requisicoes
 from app.aplicacao.enderecos import LocalizadorDeEndereco
 from app.aplicacao.orquestrador import OrquestradorDeRota
+from app.aplicacao.restricoes import GestorDeRestricoes
 from app.infra.graphhopper import AdaptadorGraphHopper
 from app.infra.nominatim import AdaptadorNominatim
 
@@ -34,7 +35,11 @@ def montar(config: Configuracao, cliente: httpx.AsyncClient) -> Dependencias:
         config.cache_validade_s,
     )
     return Dependencias(
-        config, cliente, OrquestradorDeRota(motor), LocalizadorDeEndereco(geocodificador)
+        config,
+        cliente,
+        OrquestradorDeRota(motor),
+        LocalizadorDeEndereco(geocodificador),
+        GestorDeRestricoes(config.resolucao_h3),
     )
 
 
@@ -59,6 +64,7 @@ def criar_app(dependencias: Dependencias | None = None) -> FastAPI:
     registrar_requisicoes(app)
     registrar_tratadores(app)
     app.include_router(rotas.router)
+    app.include_router(restricoes.router)
     app.include_router(enderecos.router)
 
     @app.get("/health")

@@ -9,6 +9,7 @@ from fastapi import Depends, Request
 from app.api.config import Configuracao
 from app.aplicacao.enderecos import LocalizadorDeEndereco
 from app.aplicacao.orquestrador import OrquestradorDeRota
+from app.aplicacao.restricoes import GestorDeRestricoes
 
 
 @dataclass(frozen=True)
@@ -17,6 +18,7 @@ class Dependencias:
     cliente: httpx.AsyncClient
     orquestrador: OrquestradorDeRota
     localizador: LocalizadorDeEndereco
+    gestor: GestorDeRestricoes
 
 
 def _dependencias(request: Request) -> Dependencias:

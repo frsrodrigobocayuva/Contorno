@@ -26,6 +26,11 @@ no_implicit_reexport = true
 strict_equality = true
 extra_checks = true
 
+# O h3 não traz tipos (nem há pacote de tipos); o Indexador tipa o que sai dele.
+[[tool.mypy.overrides]]
+module = ["h3", "h3.*"]
+ignore_missing_imports = true
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 # Testes sem rede (P6): conexão para fora da máquina falha, exceto nos módulos marcados com
