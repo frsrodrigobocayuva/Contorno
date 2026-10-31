@@ -10,10 +10,16 @@ export type RespostaCalculo =
   Esquemas['RespostaRotas'] | Esquemas['RespostaDiagnostico']
 export type RespostaEnderecos = Esquemas['RespostaEnderecos']
 export type Lugar = Esquemas['LugarDTO']
+export type RespostaArea = Esquemas['RespostaArea']
+export type RestricaoArea = Esquemas['RestricaoArea']
+export type Contorno = Esquemas['MultiPoligonoGeoJSON']
 
+// Validação: campo e motivo; área com extremo dentro (AREA_CONTEM_EXTREMO): área e extremo.
 export interface DetalheDeErro {
-  campo: string
-  motivo: string
+  campo?: string
+  motivo?: string
+  area?: string
+  extremo?: string
 }
 
 // Erro no formato único da API (DAS 6.9); REDE quando a resposta nem chegou.
@@ -57,11 +63,25 @@ async function pedir<T>(caminho: string, opcoes?: RequestInit): Promise<T> {
 export function calcularRota(
   origem: Coordenadas,
   destino: Coordenadas,
+  restricoes: RestricaoArea[] = [],
 ): Promise<RespostaCalculo> {
   return pedir('/rotas/calculo', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ origem, destino, restricoes: [] }),
+    body: JSON.stringify({ origem, destino, restricoes }),
+  })
+}
+
+// UC02: o desenho vira a área proibida, com as células, o contorno e os conflitos.
+export function definirArea(
+  poligono: Coordenadas[],
+  origem?: Coordenadas,
+  destino?: Coordenadas,
+): Promise<RespostaArea> {
+  return pedir('/restricoes/area', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ poligono, origem, destino }),
   })
 }
 

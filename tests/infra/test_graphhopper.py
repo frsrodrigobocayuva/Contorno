@@ -7,7 +7,14 @@ import httpx
 import pytest
 
 from app.dominio.excecoes import MotorIndisponivel
-from app.dominio.modelo import ConsultaDeRota, Coordenada, OpcoesDeCusto, Poligono, Rota
+from app.dominio.modelo import (
+    ConsultaDeRota,
+    Coordenada,
+    OpcoesDeCusto,
+    Poligono,
+    RegraDeCusto,
+    Rota,
+)
 from app.infra import medicao
 from app.infra.graphhopper import AdaptadorGraphHopper
 
@@ -85,12 +92,48 @@ async def test_400_inesperado_e_erro_de_programacao() -> None:
         ).calcular(CONSULTA, (), OpcoesDeCusto())
 
 
-async def test_rota_restrita_ainda_nao_e_aceita() -> None:
-    area = Poligono((Coordenada(0, 0), Coordenada(1, 0), Coordenada(1, 1)))
+async def test_restrita_vai_com_as_areas_no_custom_model_e_sem_ch() -> None:
+    pedidos: list[httpx.Request] = []
+
+    def tratar(pedido: httpx.Request) -> httpx.Response:
+        pedidos.append(pedido)
+        return httpx.Response(200, json=RESPOSTA)
+
+    quadrado = (Coordenada(0, 0), Coordenada(1, 0), Coordenada(1, 1), Coordenada(0, 1))
+    buraco = (Coordenada(0.4, 0.4), Coordenada(0.6, 0.4), Coordenada(0.6, 0.6))
+    triangulo = (Coordenada(2, 2), Coordenada(3, 2), Coordenada(3, 3), Coordenada(2, 2))
+
+    await adaptador(tratar).calcular(
+        CONSULTA, (Poligono(quadrado, (buraco,)), Poligono(triangulo)), OpcoesDeCusto()
+    )
+
+    corpo = json.loads(pedidos[0].content)
+    assert corpo["ch.disable"] is True
+    assert corpo["points_encoded"] is False
+    features = corpo["custom_model"]["areas"]["features"]
+    assert [f["id"] for f in features] == ["area0", "area1"]
+    # Cada área vai com os dois triângulos fora do recorte, que alargam o retângulo dela.
+    assert features[0]["geometry"]["type"] == "MultiPolygon"
+    area, *fora = features[0]["geometry"]["coordinates"]
+    assert area == [
+        [[0, 0], [1, 0], [1, 1], [0, 1], [0, 0]],
+        [[0.4, 0.4], [0.6, 0.4], [0.6, 0.6], [0.4, 0.4]],
+    ]
+    assert len(fora) == 2
+    assert all(abs(lon + 51) > 1.4 or abs(lat + 29.7) > 1 for lon, lat in fora[0][0] + fora[1][0])
+    assert features[1]["geometry"]["coordinates"][0] == [[[2, 2], [3, 2], [3, 3], [2, 2]]]
+    assert corpo["custom_model"]["priority"] == [
+        {"if": "in_area0", "multiply_by": "0"},
+        {"if": "in_area1", "multiply_by": "0"},
+    ]
+
+
+async def test_preferencias_de_via_ainda_nao_sao_aceitas() -> None:
+    regra = RegraDeCusto("road_class", frozenset({"RESIDENTIAL"}), 0.5)
 
     with pytest.raises(NotImplementedError):
         await adaptador(lambda _: httpx.Response(200, json=RESPOSTA)).calcular(
-            CONSULTA, (area,), OpcoesDeCusto()
+            CONSULTA, (), OpcoesDeCusto((regra,))
         )
 
 

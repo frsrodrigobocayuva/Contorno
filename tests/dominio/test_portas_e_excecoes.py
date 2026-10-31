@@ -17,10 +17,11 @@ def test_portas_sao_assincronas() -> None:
     assert inspect.iscoroutinefunction(Geocodificador.localizar)
 
 
-def test_extremo_dentro_da_area_leva_as_areas() -> None:
-    erro = ExtremoDentroDaArea(["a1", "a2"])
+def test_extremo_dentro_da_area_leva_as_areas_e_os_extremos() -> None:
+    erro = ExtremoDentroDaArea([("a1", "ORIGEM"), ("a2", "DESTINO"), ("a1", "DESTINO")])
 
     assert erro.areas == ("a1", "a2")
+    assert erro.conflitos == (("a1", "ORIGEM"), ("a2", "DESTINO"), ("a1", "DESTINO"))
     assert "a1, a2" in str(erro)
 
 

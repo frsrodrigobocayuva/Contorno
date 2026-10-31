@@ -4,7 +4,7 @@ Planejador de rotas web em que o usuário declara por onde **não** quer passar,
 
 Recorte do MVP: São Leopoldo e Novo Hamburgo (RS), sobre dados abertos do OpenStreetMap.
 
-> **Estado:** Sprint 4 concluída. Já dá para marcar origem e destino (buscando o endereço ou tocando no mapa) e ver a rota normal com tempo e distância. Declarar o que evitar (áreas, raio a partir de um endereço, classes de via) e ver o custo da escolha chegam na Sprint 5.
+> **Estado:** Sprint 5 em andamento. Já dá para marcar origem e destino (buscando o endereço ou tocando no mapa), ver a rota normal, desenhar áreas proibidas e ver a rota que as evita, com o custo da escolha. O raio a partir de um endereço, as classes de via e o diagnóstico que aponta a área que bloqueia chegam ainda na Sprint 5.
 
 ## Pilha
 
@@ -36,7 +36,8 @@ A API, na mesma porta (contrato completo em `/docs`):
 
 | Rota | O que faz |
 |---|---|
-| `POST /rotas/calculo` | rota entre origem e destino (`[longitude, latitude]`), ou o diagnóstico quando não há caminho |
+| `POST /rotas/calculo` | rota normal entre origem e destino (`[longitude, latitude]`) e, com áreas em `restricoes`, a rota que as evita; ou o diagnóstico quando não há caminho |
+| `POST /restricoes/area` | o desenho de uma área vira células H3: devolve as células, o contorno, a área desenhada e a proibida em m² e os conflitos com a origem e o destino |
 | `GET /enderecos?q=` | até 5 endereços em São Leopoldo e Novo Hamburgo; sem resultado, lista vazia com o motivo |
 | `GET /health` | 200 quando a API e o motor estão no ar |
 
@@ -59,10 +60,18 @@ ruff check . && ruff format --check . && mypy && pytest
 cd web && npm run format:check && npm run lint && npm run typecheck && npm test && npm run build
 ```
 
-Testes de contrato contra o GraphHopper real, dentro da rede do compose:
+Testes de contrato contra o GraphHopper real, dentro da rede do compose, com o conjunto de validação de rotas (D16: nenhuma rota restrita cruza o contorno):
 
 ```bash
 docker compose run --rm dev pytest tests/contrato --no-cov
+```
+
+Ponta a ponta (Playwright), contra o app do compose em `localhost:8000`:
+
+```bash
+cd web
+npx playwright install chromium   # uma vez
+npm run e2e
 ```
 
 Tipos do contrato da API: quando a API mudar, gere de novo o OpenAPI e os tipos TypeScript, e versione os dois (`web/src/api/openapi.json` e `web/src/api/schema.ts`):

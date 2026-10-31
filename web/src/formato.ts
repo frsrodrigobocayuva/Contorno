@@ -1,4 +1,4 @@
-// Tempo e distância como o painel mostra: "13 min · 12,8 km".
+// Tempo, distância e área como o painel mostra: "13 min · 12,8 km", "+6 min · +1,8 km", "0,91 km²".
 
 export function formatarDuracao(segundos: number): string {
   const minutos = Math.round(segundos / 60)
@@ -17,4 +17,19 @@ export function formatarDistancia(metros: number): string {
     maximumFractionDigits: 1,
   })
   return `${km} km`
+}
+
+// O custo da restrição contra a irrestrita (RN02), sempre com sinal.
+export function formatarCusto(segundos: number, metros: number): string {
+  const minutos = Math.round(segundos / 60)
+  const sinal = (n: number) => (n < 0 ? '−' : '+')
+  return `${sinal(minutos)}${formatarDuracao(Math.abs(minutos) * 60)} · ${sinal(metros)}${formatarDistancia(Math.abs(metros))}`
+}
+
+export function formatarArea(metrosQuadrados: number): string {
+  const km2 = (metrosQuadrados / 1_000_000).toLocaleString('pt-BR', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })
+  return `${km2} km²`
 }

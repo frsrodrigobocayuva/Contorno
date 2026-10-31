@@ -1,4 +1,4 @@
-"""POST /rotas/calculo (UC01): a rota irrestrita como linha de base."""
+"""POST /rotas/calculo (UC01): a irrestrita como linha de base e, com áreas, a restrita validada."""
 
 from fastapi import APIRouter
 
@@ -13,7 +13,12 @@ from app.api.esquemas import (
     RespostaRotas,
     RotaDTO,
 )
-from app.dominio.modelo import ConsultaDeRota, Coordenada, Diagnostico, Rota
+from app.dominio import indexador
+from app.dominio.modelo import AreaExcluida, ConsultaDeRota, Coordenada, Diagnostico, Rota
+
+# Teto de células de uma área descompactada: o recorte inteiro, na resolução 11, tem cerca de
+# 265 mil. Protege a API de um conjunto compactado que explodiria na descompactação.
+LIMITE_DE_CELULAS = 300_000
 
 router = APIRouter()
 
@@ -32,7 +37,7 @@ def _rota(rota: Rota) -> RotaDTO:
     responses={422: {"model": Erro}, 503: {"model": Erro}},
 )
 async def calcular(pedido: PedidoDeRota, dependencias: Deps) -> RespostaRotas | RespostaDiagnostico:
-    """A rota irrestrita entre origem e destino; sem caminho, o diagnóstico (D6)."""
+    """A irrestrita e, com áreas, a restrita validada; sem caminho, o diagnóstico (D6)."""
     fora = [
         {"campo": campo, "motivo": "FORA_DA_REGIAO"}
         for campo, (longitude, latitude) in (("origem", pedido.origem), ("destino", pedido.destino))
@@ -40,7 +45,25 @@ async def calcular(pedido: PedidoDeRota, dependencias: Deps) -> RespostaRotas | 
     ]
     if fora:
         raise EntradaInvalida(fora)
-    consulta = ConsultaDeRota(Coordenada(*pedido.origem), Coordenada(*pedido.destino))
+    ids = [r.id for r in pedido.restricoes]
+    if len(set(ids)) != len(ids):
+        raise EntradaInvalida([{"campo": "restricoes", "motivo": "ID_REPETIDO"}])
+    try:
+        areas = tuple(
+            AreaExcluida(
+                r.id,
+                r.rotulo,
+                indexador.descompactar(
+                    (int(c, 16) for c in r.celulas),
+                    dependencias.config.resolucao_h3,
+                    LIMITE_DE_CELULAS,
+                ),
+            )
+            for r in pedido.restricoes
+        )
+    except ValueError as erro:
+        raise EntradaInvalida([{"campo": "restricoes", "motivo": str(erro)}]) from erro
+    consulta = ConsultaDeRota(Coordenada(*pedido.origem), Coordenada(*pedido.destino), areas)
     resultado = await dependencias.orquestrador.calcular(consulta)
     if isinstance(resultado, Diagnostico):
         return RespostaDiagnostico(
@@ -48,4 +71,7 @@ async def calcular(pedido: PedidoDeRota, dependencias: Deps) -> RespostaRotas | 
             candidatas=list(resultado.candidatas),
             mensagem=resultado.mensagem(),
         )
-    return RespostaRotas(irrestrita=_rota(resultado.irrestrita))
+    return RespostaRotas(
+        irrestrita=_rota(resultado.irrestrita),
+        restrita=_rota(resultado.restrita) if resultado.restrita else None,
+    )

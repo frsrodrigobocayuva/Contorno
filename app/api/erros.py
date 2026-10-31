@@ -7,7 +7,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 from app.api.esquemas import Erro
-from app.dominio.excecoes import MotorIndisponivel
+from app.dominio.excecoes import ExtremoDentroDaArea, MotorIndisponivel
 
 log = logging.getLogger("contorno.erros")
 
@@ -41,6 +41,13 @@ async def _entrada_invalida(_: Request, erro: Exception) -> JSONResponse:
     return _resposta(422, "VALIDACAO", "Entrada inválida.", erro.detalhes)
 
 
+async def _extremo_dentro_da_area(_: Request, erro: Exception) -> JSONResponse:
+    assert isinstance(erro, ExtremoDentroDaArea)
+    detalhes = [{"area": area, "extremo": extremo} for area, extremo in erro.conflitos]
+    mensagem = "A origem ou o destino está dentro de uma área declarada."
+    return _resposta(422, "AREA_CONTEM_EXTREMO", mensagem, detalhes)
+
+
 async def _motor_indisponivel(_: Request, erro: Exception) -> JSONResponse:
     log.warning("motor indisponível: %s", erro)
     return _resposta(503, "MOTOR_INDISPONIVEL", "Não foi possível calcular a rota agora.")
@@ -54,5 +61,6 @@ async def _interno(_: Request, erro: Exception) -> JSONResponse:
 def registrar_tratadores(app: FastAPI) -> None:
     app.add_exception_handler(RequestValidationError, _validacao)
     app.add_exception_handler(EntradaInvalida, _entrada_invalida)
+    app.add_exception_handler(ExtremoDentroDaArea, _extremo_dentro_da_area)
     app.add_exception_handler(MotorIndisponivel, _motor_indisponivel)
     app.add_exception_handler(Exception, _interno)

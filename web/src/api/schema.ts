@@ -15,9 +15,32 @@ export interface paths {
         put?: never;
         /**
          * Calcular
-         * @description A rota irrestrita entre origem e destino; sem caminho, o diagnóstico (D6).
+         * @description A irrestrita e, com áreas, a restrita validada; sem caminho, o diagnóstico (D6).
          */
         post: operations["calcular_rotas_calculo_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/restricoes/area": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Definir Area
+         * @description As células da área, o contorno delas e os conflitos com a origem e o destino (UC02).
+         *
+         *     Recusa, antes do domínio (DAS 6.10), desenho fora de São Leopoldo e Novo Hamburgo, com menos
+         *     de três vértices distintos ou que se cruza.
+         */
+        post: operations["definir_area_restricoes_area_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -72,7 +95,7 @@ export interface components {
          * CausaDeInviabilidade
          * @enum {string}
          */
-        CausaDeInviabilidade: "DESTINO_INALCANCAVEL" | "RESTRICAO_UNICA" | "COMBINACAO_DE_RESTRICOES";
+        CausaDeInviabilidade: "DESTINO_INALCANCAVEL" | "RESTRICAO_UNICA" | "COMBINACAO_DE_RESTRICOES" | "AREAS_BLOQUEIAM";
         /**
          * Erro
          * @description Formato único de erro (DAS 6.9).
@@ -87,6 +110,11 @@ export interface components {
                 [key: string]: string;
             }[] | null;
         };
+        /**
+         * Extremo
+         * @enum {string}
+         */
+        Extremo: "ORIGEM" | "DESTINO";
         /** LinhaGeoJSON */
         LinhaGeoJSON: {
             /**
@@ -116,6 +144,44 @@ export interface components {
          * @enum {string}
          */
         MotivoDeBuscaVazia: "SEM_RESULTADO" | "SERVICO_INDISPONIVEL";
+        /** MultiPoligonoGeoJSON */
+        MultiPoligonoGeoJSON: {
+            /**
+             * Type
+             * @default MultiPolygon
+             * @constant
+             */
+            type: "MultiPolygon";
+            /** Coordinates */
+            coordinates: [
+                number,
+                number
+            ][][][];
+        };
+        /**
+         * PedidoDeArea
+         * @description Desenho do usuário (UC02) e, se já escolhidos, a origem e o destino da consulta.
+         */
+        PedidoDeArea: {
+            /**
+             * Poligono
+             * @description Vértices do desenho, em ordem, sem repetir o primeiro no fim.
+             */
+            poligono: [
+                number,
+                number
+            ][];
+            /** Origem */
+            origem?: [
+                number,
+                number
+            ] | null;
+            /** Destino */
+            destino?: [
+                number,
+                number
+            ] | null;
+        };
         /** PedidoDeRota */
         PedidoDeRota: {
             /** Origem */
@@ -130,11 +196,30 @@ export interface components {
             ];
             /**
              * Restricoes
-             * @description Áreas e preferências de via; entram na Sprint 5, por ora só lista vazia.
+             * @description Áreas declaradas; as preferências de via entram na S5-02.
              */
-            restricoes?: {
-                [key: string]: unknown;
-            }[];
+            restricoes?: components["schemas"]["RestricaoArea"][];
+        };
+        /**
+         * RespostaArea
+         * @description A área proibida para o usuário conferir (UC02; RN04).
+         */
+        RespostaArea: {
+            /**
+             * Celulas
+             * @description Células H3 compactadas, em hexadecimal (ADR-011).
+             */
+            celulas: string[];
+            contorno: components["schemas"]["MultiPoligonoGeoJSON"];
+            /** Areadesenhadam2 */
+            areaDesenhadaM2: number;
+            /** Areaproibidam2 */
+            areaProibidaM2: number;
+            /**
+             * Conflitos
+             * @description Extremos que caem dentro da área (UC02, B).
+             */
+            conflitos: components["schemas"]["Extremo"][];
         };
         /**
          * RespostaDiagnostico
@@ -167,6 +252,29 @@ export interface components {
             tipo: "ROTAS";
             irrestrita: components["schemas"]["RotaDTO"];
             restrita?: components["schemas"]["RotaDTO"] | null;
+        };
+        /**
+         * RestricaoArea
+         * @description Área declarada, com as células que o cliente recebeu em /restricoes/area (UC01, [2]).
+         */
+        RestricaoArea: {
+            /**
+             * Tipo
+             * @constant
+             */
+            tipo: "AREA";
+            /**
+             * Id
+             * @description Gerado no cliente (plano, A8).
+             */
+            id: string;
+            /**
+             * Rotulo
+             * @description O nome, ou "Área N".
+             */
+            rotulo: string;
+            /** Celulas */
+            celulas: string[];
         };
         /** RotaDTO */
         RotaDTO: {
@@ -218,6 +326,39 @@ export interface operations {
             };
             /** @description Service Unavailable */
             503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Erro"];
+                };
+            };
+        };
+    };
+    definir_area_restricoes_area_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PedidoDeArea"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RespostaArea"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };

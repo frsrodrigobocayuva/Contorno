@@ -260,6 +260,7 @@ def test_resultado_restrita_se_e_so_se_houver_restricoes() -> None:
         (CausaDeInviabilidade.RESTRICAO_UNICA, ("a1",)),
         (CausaDeInviabilidade.RESTRICAO_UNICA, ("a1", "a2")),
         (CausaDeInviabilidade.COMBINACAO_DE_RESTRICOES, ("a1", "a2")),
+        (CausaDeInviabilidade.AREAS_BLOQUEIAM, ()),
     ],
 )
 def test_diagnostico_valido(causa: CausaDeInviabilidade, candidatas: tuple[str, ...]) -> None:
@@ -273,6 +274,7 @@ def test_diagnostico_valido(causa: CausaDeInviabilidade, candidatas: tuple[str, 
         (CausaDeInviabilidade.RESTRICAO_UNICA, ()),
         (CausaDeInviabilidade.COMBINACAO_DE_RESTRICOES, ("a1",)),
         (CausaDeInviabilidade.RESTRICAO_UNICA, ("a1", "a1")),
+        (CausaDeInviabilidade.AREAS_BLOQUEIAM, ("a1",)),
     ],
 )
 def test_diagnostico_invalido(causa: CausaDeInviabilidade, candidatas: tuple[str, ...]) -> None:
@@ -330,6 +332,7 @@ def test_regra_de_custo_invalida(chave: str, valores: frozenset[str], fator: flo
         (CausaDeInviabilidade.DESTINO_INALCANCAVEL, ()),
         (CausaDeInviabilidade.RESTRICAO_UNICA, ("a1",)),
         (CausaDeInviabilidade.COMBINACAO_DE_RESTRICOES, ("a1", "a2")),
+        (CausaDeInviabilidade.AREAS_BLOQUEIAM, ()),
     ],
 )
 def test_diagnostico_tem_mensagem_para_cada_causa(
@@ -342,3 +345,8 @@ def test_destino_inalcancavel_diz_que_a_causa_nao_sao_as_restricoes() -> None:
     mensagem = Diagnostico(CausaDeInviabilidade.DESTINO_INALCANCAVEL).mensagem()
 
     assert "não são as áreas nem as preferências" in mensagem
+
+
+def test_area_que_chega_so_com_as_celulas_nao_tem_origem() -> None:
+    assert area("a9").origem is not None
+    assert AreaExcluida("a9", "Área 9", area("a9").celulas).origem is None

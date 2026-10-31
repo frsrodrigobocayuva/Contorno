@@ -1,7 +1,8 @@
+import { createRef } from 'react'
 import { render } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Coordenadas } from '../api/cliente'
-import { Mapa } from './Mapa'
+import { Mapa, type ControleDoMapa } from './Mapa'
 
 // O MapLibre precisa de WebGL, que o jsdom não tem: um falso guarda as opções e os eventos e
 // deixa o teste dizer quando o estilo terminou de carregar.
@@ -11,7 +12,10 @@ class MapaFalso {
   static ultimo: MapaFalso
   opcoes: Record<string, unknown>
   tratadores: Record<string, Tratador[]> = {}
-  fontes: Record<string, { setData: ReturnType<typeof vi.fn> }> = {}
+  fontes: Record<
+    string,
+    { setData: ReturnType<typeof vi.fn>; inicial: unknown }
+  > = {}
   camadas: Record<string, unknown>[] = []
   estiloCarregado = false
   fitBounds = vi.fn()
@@ -35,8 +39,9 @@ class MapaFalso {
   addControl() {
     return this
   }
-  addSource(id: string) {
-    this.fontes[id] = { setData: vi.fn() }
+  addImage = vi.fn()
+  addSource(id: string, fonte: { data?: unknown }) {
+    this.fontes[id] = { setData: vi.fn(), inicial: fonte.data }
   }
   addLayer(camada: Record<string, unknown>) {
     this.camadas.push(camada)
@@ -49,6 +54,28 @@ class MapaFalso {
   }
   remove() {}
 }
+
+// O Terra Draw precisa do mapa de verdade: no lugar dele, um editor falso que registra os pedidos.
+const { editores } = vi.hoisted(() => ({
+  editores: [] as {
+    iniciar: ReturnType<typeof vi.fn>
+    parar: ReturnType<typeof vi.fn>
+    desfazer: ReturnType<typeof vi.fn>
+    vertices: ReturnType<typeof vi.fn>
+  }[],
+}))
+vi.mock('../restricoes/editor', () => ({
+  EditorDeArea: function () {
+    const editor = {
+      iniciar: vi.fn(),
+      parar: vi.fn(),
+      desfazer: vi.fn(),
+      vertices: vi.fn(() => [[-51.15, -29.76]]),
+    }
+    editores.push(editor)
+    return editor
+  },
+}))
 
 vi.mock('maplibre-gl', () => ({
   Map: function (opcoes: Record<string, unknown>) {
@@ -65,6 +92,7 @@ vi.mock('maplibre-gl', () => ({
   },
   NavigationControl: class {},
   addProtocol: vi.fn(),
+  setWorkerUrl: vi.fn(),
 }))
 
 const ROTA: Coordenadas[] = [
@@ -88,6 +116,7 @@ function apontar(elemento: Element, tipo: string) {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  editores.length = 0
 })
 
 describe('Mapa', () => {
@@ -112,11 +141,12 @@ describe('Mapa', () => {
 
     mapa.disparar('load')
 
-    expect(mapa.fontes.rota.setData).toHaveBeenLastCalledWith(
+    expect(mapa.fontes.rota.inicial).toEqual(
       expect.objectContaining({
         geometry: { type: 'LineString', coordinates: ROTA },
       }),
     )
+    expect(mapa.fitBounds).toHaveBeenCalled()
   })
 
   it('apaga a linha quando a rota sai', () => {
@@ -190,5 +220,71 @@ describe('Mapa', () => {
     MapaFalso.ultimo.disparar('dblclick', { preventDefault })
 
     expect(preventDefault).not.toHaveBeenCalled()
+  })
+
+  it('desenha a rota restrita e as áreas nas fontes delas', () => {
+    const contorno = {
+      type: 'MultiPolygon' as const,
+      coordinates: [
+        [
+          [
+            [-51.15, -29.76],
+            [-51.14, -29.76],
+            [-51.14, -29.75],
+            [-51.15, -29.76],
+          ] as [number, number][],
+        ],
+      ],
+    }
+    const { rerender } = render(<Mapa rota={ROTA} />)
+    const mapa = MapaFalso.ultimo
+    carregarEDepoisBuscarTiles(mapa)
+
+    rerender(
+      <Mapa rota={ROTA} rotaRestrita={ROTA} areas={[{ id: 'a1', contorno }]} />,
+    )
+
+    expect(mapa.fontes['rota-restrita'].setData).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        geometry: { type: 'LineString', coordinates: ROTA },
+      }),
+    )
+    expect(mapa.fontes.areas.setData).toHaveBeenLastCalledWith({
+      type: 'FeatureCollection',
+      features: [
+        { type: 'Feature', properties: { id: 'a1' }, geometry: contorno },
+      ],
+    })
+    expect(mapa.addImage).toHaveBeenCalledWith(
+      'hachura',
+      expect.objectContaining({ width: 8, height: 8 }),
+    )
+  })
+
+  it('liga o editor com o desenho e desliga sem ele', () => {
+    const inicial: Coordenadas[] = [
+      [-51.15, -29.76],
+      [-51.14, -29.76],
+      [-51.14, -29.75],
+    ]
+    const { rerender } = render(<Mapa desenho={{ inicial }} />)
+    MapaFalso.ultimo.disparar('load')
+    const [editor] = editores
+
+    expect(editor.iniciar).toHaveBeenCalledWith(inicial)
+
+    rerender(<Mapa desenho={null} />)
+    expect(editor.parar).toHaveBeenCalled()
+  })
+
+  it('o controle do mapa passa o desfazer e os vértices para o editor', () => {
+    const controle = createRef<ControleDoMapa>()
+    render(<Mapa ref={controle} />)
+    MapaFalso.ultimo.disparar('load')
+
+    controle.current!.desfazer()
+
+    expect(editores[0].desfazer).toHaveBeenCalled()
+    expect(controle.current!.vertices()).toEqual([[-51.15, -29.76]])
   })
 })
