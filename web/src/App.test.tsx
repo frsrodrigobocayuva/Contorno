@@ -618,4 +618,42 @@ describe('App', () => {
       ).not.toBeInTheDocument()
     })
   })
+
+  describe('voltar para a abertura (teste do S5-01)', () => {
+    it('com tudo vazio, o Esc volta para a abertura', () => {
+      comecar()
+
+      fireEvent.keyDown(window, { key: 'Escape' })
+
+      expect(
+        screen.getByRole('button', { name: 'Começar' }),
+      ).toBeInTheDocument()
+      expect(screen.queryByLabelText('Origem')).not.toBeInTheDocument()
+    })
+
+    it('o primeiro Esc cancela a rota; o segundo volta para a abertura', () => {
+      comecar()
+      marcarOrigemEDestino()
+
+      fireEvent.keyDown(window, { key: 'Escape' })
+      expect(screen.getByLabelText('Origem')).toHaveValue('')
+
+      fireEvent.keyDown(window, { key: 'Escape' })
+      expect(
+        screen.getByRole('button', { name: 'Começar' }),
+      ).toBeInTheDocument()
+    })
+
+    it('tocar no mapa na abertura começa, sem marcar ponto', () => {
+      render(<App />)
+
+      fireEvent.click(screen.getByRole('button', { name: 'tocar no mapa' }))
+
+      expect(screen.getByLabelText('Origem')).toHaveValue('')
+      expect(screen.getByLabelText('Destino')).toHaveValue('')
+      expect(
+        screen.queryByRole('button', { name: 'Começar' }),
+      ).not.toBeInTheDocument()
+    })
+  })
 })

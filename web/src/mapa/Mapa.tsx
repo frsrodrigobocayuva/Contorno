@@ -249,12 +249,13 @@ export function Mapa({ ref, ...props }: Props) {
         source: 'rota',
         layout: { 'line-cap': 'round', 'line-join': 'round' },
         paint: {
-          'line-color': '#6E6E6E',
+          'line-color': '#594927',
           'line-width': 4,
           'line-dasharray': [2, 1.5],
         },
       })
-      // A rota com restrições, na cor de destaque (Guia de Estilo), por cima da irrestrita.
+      // As duas rotas na cor de destaque (Guia de Estilo): a irrestrita tracejada, porque o cinza
+      // se perdia no mapa (teste do usuário, 2026-10-31), e a restrita em linha cheia, por cima.
       novo.addLayer({
         id: 'rota-restrita',
         type: 'line',
