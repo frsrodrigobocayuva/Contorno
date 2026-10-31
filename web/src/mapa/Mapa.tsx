@@ -6,9 +6,11 @@ import {
   Map as MapLibreMap,
   Marker,
   NavigationControl,
+  setWorkerUrl,
   type GeoJSONSource,
   type MapOptions,
 } from 'maplibre-gl'
+import enderecoDoWorker from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url'
 import { useEffect, useImperativeHandle, useRef, type Ref } from 'react'
 import type { Contorno, Coordenadas } from '../api/cliente'
 import { EditorDeArea, type EstadoDoDesenho } from '../restricoes/editor'
@@ -24,6 +26,11 @@ const LIMITES: [Coordenadas, Coordenadas] = [
   [REGIAO[0][0] - FOLGA, REGIAO[0][1] - FOLGA],
   [REGIAO[1][0] + FOLGA, REGIAO[1][1] + FOLGA],
 ]
+
+// O MapLibre 6 monta o endereço do worker em tempo de execução, e o Vite não leva o arquivo para
+// o build: sem isto, o worker dá 404 e as fontes GeoJSON (rotas e áreas) não aparecem. Os tiles e
+// os marcadores não dependem dele, por isso o mapa parecia normal (ponta a ponta, 2026-10-31).
+setWorkerUrl(enderecoDoWorker)
 
 // Configurável para os testes ponta a ponta usarem o tile em branco (plano, A5).
 const TILES =

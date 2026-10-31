@@ -126,6 +126,22 @@ jobs:
         run: curl -fsS http://localhost:8000/health
       - name: Testes de contrato e dos falsos
         run: docker compose run --rm dev pytest tests/contrato tests/falsos --no-cov
+      # Ponta a ponta (plano, P12): o app de verdade, num Chromium sem tela, contra o compose.
+      # As buscas vão aos falsos do Nominatim; os tiles da OSM ficam bloqueados.
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24.22.1"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Dependências do front
+        working-directory: web
+        run: npm ci
+      - name: Chromium do Playwright
+        working-directory: web
+        run: npx playwright install --with-deps chromium
+      - name: Ponta a ponta (Playwright)
+        working-directory: web
+        run: npx playwright test
       - name: Logs do compose
         if: failure()
         run: docker compose logs

@@ -12,7 +12,8 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "vitest run",
-    "generate:api-types": "openapi-typescript src/api/openapi.json -o src/api/schema.ts"
+    "generate:api-types": "openapi-typescript src/api/openapi.json -o src/api/schema.ts",
+    "e2e": "playwright test"
   },
   "dependencies": {
     "@fontsource/atkinson-hyperlegible": "5.3.0",
@@ -24,6 +25,7 @@
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
+    "@playwright/test": "1.64.1",
     "@testing-library/jest-dom": "7.0.1",
     "@testing-library/react": "16.3.3",
     "@types/node": "24.19.2",

@@ -92,6 +92,7 @@ vi.mock('maplibre-gl', () => ({
   },
   NavigationControl: class {},
   addProtocol: vi.fn(),
+  setWorkerUrl: vi.fn(),
 }))
 
 const ROTA: Coordenadas[] = [
