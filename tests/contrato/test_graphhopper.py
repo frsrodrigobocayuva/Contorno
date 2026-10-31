@@ -3,13 +3,22 @@
 Roda dentro da rede do compose: docker compose run --rm dev pytest tests/contrato
 """
 
+import math
 import os
 
 import httpx
 import pytest
 
-from app.dominio.modelo import ConsultaDeRota, Coordenada, OpcoesDeCusto
-from app.infra.graphhopper import AdaptadorGraphHopper
+from app.dominio.modelo import (
+    ClasseDeVia,
+    ConsultaDeRota,
+    Coordenada,
+    NivelDeEvitacao,
+    OpcoesDeCusto,
+    PreferenciaVia,
+)
+from app.dominio.tradutor import opcoes_de_custo
+from app.infra.graphhopper import AdaptadorGraphHopper, corpo_da_rota
 
 GRAPHHOPPER_URL = os.environ.get("GRAPHHOPPER_URL", "")
 
@@ -101,3 +110,40 @@ async def test_adaptador_calcula_a_rota_irrestrita_conhecida() -> None:
     assert 5_000 < rota.distancia_metros < 30_000
     assert rota.duracao_segundos > 0
     assert rota.geometria[0] != rota.geometria[-1]
+
+
+def metros_por_classe(opcoes: OpcoesDeCusto, classes: set[str]) -> float:
+    """Metros da rota nas classes de via pedidas, pelo detalhe road_class do GraphHopper."""
+    consulta = ConsultaDeRota(Coordenada(*UNISINOS), Coordenada(*CENTRO_NOVO_HAMBURGO))
+    resposta = rota({**corpo_da_rota(consulta, (), opcoes), "details": ["road_class"]})
+    assert resposta.status_code == 200, resposta.text
+    caminho = resposta.json()["paths"][0]
+    pontos = caminho["points"]["coordinates"]
+
+    def metros(a: list[float], b: list[float]) -> float:
+        lat = math.radians((a[1] + b[1]) / 2)
+        dx = math.radians(b[0] - a[0]) * math.cos(lat)
+        dy = math.radians(b[1] - a[1])
+        return 6_371_000 * math.hypot(dx, dy)
+
+    return sum(
+        metros(pontos[i], pontos[i + 1])
+        for inicio, fim, classe in caminho["details"]["road_class"]
+        if classe in classes
+        for i in range(inicio, fim)
+    )
+
+
+def test_rodovia_evitada_fortemente_tira_metros_de_rodovia() -> None:
+    """Via penalizada (DAS 6.13): a preferência chega ao motor e muda a rota, sem proibir."""
+    # Nos detalhes da resposta, o GraphHopper escreve a classe em minúsculas.
+    rodovias = {"motorway", "trunk"}
+    evitar = opcoes_de_custo(
+        [PreferenciaVia(ClasseDeVia.RODOVIA, NivelDeEvitacao.EVITAR_FORTEMENTE)]
+    )
+
+    sem_preferencia = metros_por_classe(OpcoesDeCusto(), rodovias)
+    com_preferencia = metros_por_classe(evitar, rodovias)
+
+    assert sem_preferencia > 1_000
+    assert com_preferencia < sem_preferencia * 0.5

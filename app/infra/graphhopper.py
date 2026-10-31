@@ -7,7 +7,14 @@ from typing import Any
 import httpx
 
 from app.dominio.excecoes import MotorIndisponivel
-from app.dominio.modelo import ConsultaDeRota, Coordenada, OpcoesDeCusto, Poligono, Rota
+from app.dominio.modelo import (
+    ConsultaDeRota,
+    Coordenada,
+    OpcoesDeCusto,
+    Poligono,
+    RegraDeCusto,
+    Rota,
+)
 from app.infra import medicao
 
 # Respostas 400 do GraphHopper que significam "rota vazia", e não erro (DAS 6.4).
@@ -55,6 +62,37 @@ def modelo_com_exclusoes(exclusoes: Sequence[Poligono]) -> dict[str, Any]:
     }
 
 
+# O vocabulário OpenStreetMap do Tradutor nos valores codificados do GraphHopper (DAS 6.5).
+_VALOR_CODIFICADO = {"highway": "road_class", "surface": "surface"}
+
+
+def _condicao(regra: RegraDeCusto) -> dict[str, str]:
+    """Regra de via na sintaxe do custom_model: encarece por um fator entre 0 e 1 (RN06)."""
+    valor = _VALOR_CODIFICADO[regra.chave_osm]
+    casos = " || ".join(f"{valor} == {v.upper()}" for v in sorted(regra.valores_osm))
+    return {"if": casos, "multiply_by": str(regra.fator)}
+
+
+def corpo_da_rota(
+    consulta: ConsultaDeRota, exclusoes: Sequence[Poligono], opcoes: OpcoesDeCusto
+) -> dict[str, Any]:
+    """O pedido ao /route: irrestrita no CH; com áreas ou regras, restrita no LM (ADR-014)."""
+    corpo: dict[str, Any] = {
+        "profile": "car",
+        "points": [
+            [consulta.origem.longitude, consulta.origem.latitude],
+            [consulta.destino.longitude, consulta.destino.latitude],
+        ],
+        "points_encoded": False,
+    }
+    if exclusoes or opcoes.regras:
+        modelo: dict[str, Any] = modelo_com_exclusoes(exclusoes) if exclusoes else {"priority": []}
+        modelo["priority"] += [_condicao(r) for r in opcoes.regras]
+        corpo["ch.disable"] = True
+        corpo["custom_model"] = modelo
+    return corpo
+
+
 class AdaptadorGraphHopper:
     def __init__(self, cliente: httpx.AsyncClient, url: str, tempo_maximo_s: float) -> None:
         self._cliente = cliente
@@ -64,21 +102,7 @@ class AdaptadorGraphHopper:
     async def calcular(
         self, consulta: ConsultaDeRota, exclusoes: Sequence[Poligono], opcoes: OpcoesDeCusto
     ) -> Rota | None:
-        if opcoes.regras:
-            # Ignorar uma preferência mudaria a rota sem avisar: as regras de via entram na S5-02.
-            raise NotImplementedError("preferências de via entram na S5-02")
-        corpo: dict[str, Any] = {
-            "profile": "car",
-            "points": [
-                [consulta.origem.longitude, consulta.origem.latitude],
-                [consulta.destino.longitude, consulta.destino.latitude],
-            ],
-            "points_encoded": False,
-        }
-        if exclusoes:
-            # Restrita: CH desligado, acelerada por LM (ADR-014), com as áreas no custom_model.
-            corpo["ch.disable"] = True
-            corpo["custom_model"] = modelo_com_exclusoes(exclusoes)
+        corpo = corpo_da_rota(consulta, exclusoes, opcoes)
         inicio = time.perf_counter()
         try:
             resposta = await self._cliente.post(

@@ -128,13 +128,51 @@ async def test_restrita_vai_com_as_areas_no_custom_model_e_sem_ch() -> None:
     ]
 
 
-async def test_preferencias_de_via_ainda_nao_sao_aceitas() -> None:
-    regra = RegraDeCusto("road_class", frozenset({"RESIDENTIAL"}), 0.5)
+async def test_regras_de_via_viram_condicoes_do_custom_model() -> None:
+    pedidos: list[httpx.Request] = []
 
-    with pytest.raises(NotImplementedError):
-        await adaptador(lambda _: httpx.Response(200, json=RESPOSTA)).calcular(
-            CONSULTA, (), OpcoesDeCusto((regra,))
-        )
+    def tratar(pedido: httpx.Request) -> httpx.Response:
+        pedidos.append(pedido)
+        return httpx.Response(200, json=RESPOSTA)
+
+    regras = (
+        RegraDeCusto("surface", frozenset({"unpaved", "dirt"}), 0.05),
+        RegraDeCusto("highway", frozenset({"residential", "living_street"}), 0.5),
+    )
+
+    await adaptador(tratar).calcular(CONSULTA, (), OpcoesDeCusto(regras))
+
+    corpo = json.loads(pedidos[0].content)
+    assert corpo["ch.disable"] is True
+    assert corpo["custom_model"] == {
+        "priority": [
+            {"if": "surface == DIRT || surface == UNPAVED", "multiply_by": "0.05"},
+            {
+                "if": "road_class == LIVING_STREET || road_class == RESIDENTIAL",
+                "multiply_by": "0.5",
+            },
+        ]
+    }
+
+
+async def test_area_e_regra_vao_no_mesmo_custom_model() -> None:
+    pedidos: list[httpx.Request] = []
+
+    def tratar(pedido: httpx.Request) -> httpx.Response:
+        pedidos.append(pedido)
+        return httpx.Response(200, json=RESPOSTA)
+
+    area = Poligono((Coordenada(0, 0), Coordenada(1, 0), Coordenada(1, 1)))
+    regra = RegraDeCusto("highway", frozenset({"motorway"}), 0.1)
+
+    await adaptador(tratar).calcular(CONSULTA, (area,), OpcoesDeCusto((regra,)))
+
+    modelo = json.loads(pedidos[0].content)["custom_model"]
+    assert [f["id"] for f in modelo["areas"]["features"]] == ["area0"]
+    assert modelo["priority"] == [
+        {"if": "in_area0", "multiply_by": "0"},
+        {"if": "road_class == MOTORWAY", "multiply_by": "0.1"},
+    ]
 
 
 async def test_registra_o_tempo_de_cada_chamada() -> None:
