@@ -27,12 +27,13 @@ const TILES =
   (import.meta.env.VITE_TILES_URL as string | undefined) ??
   'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
 
-// Atenuado até o desenho do mapa vir com a identidade visual (plano, 2026-10-29): sem cor, mais
-// claro e com menos contraste, para a rota e os marcadores se destacarem.
+// Atenuado até o desenho do mapa vir com a identidade visual (plano, 2026-10-29): sem cor e um
+// pouco mais claro, para a rota e os marcadores se destacarem. O contraste fica o do OSM, para as
+// ruas e os nomes continuarem legíveis (teste do usuário, 2026-10-30).
 const ATENUADO = {
   'raster-saturation': -1,
-  'raster-brightness-min': 0.35,
-  'raster-contrast': -0.25,
+  'raster-brightness-min': 0.15,
+  'raster-contrast': 0,
 }
 
 const ESTILO: NonNullable<MapOptions['style']> = {

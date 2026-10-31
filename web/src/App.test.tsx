@@ -294,14 +294,25 @@ describe('App', () => {
       )
     })
 
-    it('na rota, o botão do topo volta para origem e destino vazios', async () => {
+    it('na rota, o botão fica abaixo das restrições e volta para origem e destino vazios', async () => {
       api([[/^\/rotas\/calculo$/, () => json(ROTA)]])
       comecar()
       marcarOrigemEDestino()
       fireEvent.click(screen.getByRole('button', { name: 'Calcular rota' }))
       await screen.findByText('13 min · 12,8 km')
+      const cancelar = screen.getByRole('button', { name: 'Cancelar rota' })
+      expect(
+        within(screen.getByRole('banner')).queryByRole('button', {
+          name: 'Cancelar rota',
+        }),
+      ).not.toBeInTheDocument()
+      expect(
+        screen
+          .getByRole('button', { name: /Classes de via/ })
+          .compareDocumentPosition(cancelar) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy()
 
-      fireEvent.click(screen.getByRole('button', { name: 'Cancelar rota' }))
+      fireEvent.click(cancelar)
 
       expect(screen.queryByText('13 min · 12,8 km')).not.toBeInTheDocument()
       deveEstarVazio()
