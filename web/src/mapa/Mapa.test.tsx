@@ -64,6 +64,7 @@ vi.mock('maplibre-gl', () => ({
     remove() {}
   },
   NavigationControl: class {},
+  addProtocol: vi.fn(),
 }))
 
 const ROTA: Coordenadas[] = [
@@ -146,13 +147,15 @@ describe('Mapa', () => {
     expect(mapa.keyboard.disableRotation).toHaveBeenCalled()
   })
 
-  it('mostra os tiles sem cor e atenuados', () => {
+  it('pede os tiles do OSM pelo protocolo que os recolore', () => {
     render(<Mapa />)
     const estilo = MapaFalso.ultimo.opcoes.style as {
-      layers: { paint?: Record<string, number> }[]
+      sources: { osm: { tiles: string[] } }
     }
 
-    expect(estilo.layers[0].paint).toMatchObject({ 'raster-saturation': -1 })
+    expect(estilo.sources.osm.tiles).toEqual([
+      'contorno-tinta://https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+    ])
   })
 
   it('o duplo clique do mouse cancela e não dá zoom', () => {

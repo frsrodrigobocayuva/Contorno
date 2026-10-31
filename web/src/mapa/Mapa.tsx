@@ -1,5 +1,6 @@
 // Mapa Interativo (DAS 7.2): MapLibre com os tiles raster do OpenStreetMap, só os da tela
-// atual, com atribuição (ADR-013), preso à região atendida, sempre em 2D com o norte para cima.
+// atual, com atribuição (ADR-013), nas cores do mapa (tinta.ts), preso à região atendida, sempre em
+// 2D com o norte para cima.
 import 'maplibre-gl/dist/maplibre-gl.css'
 import {
   Map as MapLibreMap,
@@ -10,6 +11,7 @@ import {
 } from 'maplibre-gl'
 import { useEffect, useRef } from 'react'
 import type { Coordenadas } from '../api/cliente'
+import { registrarTinta, tingido } from './tilesTingidos'
 
 // Retângulo de São Leopoldo + Novo Hamburgo (plano, D10), com folga para o mapa não cortar a borda.
 const REGIAO: [Coordenadas, Coordenadas] = [
@@ -27,28 +29,19 @@ const TILES =
   (import.meta.env.VITE_TILES_URL as string | undefined) ??
   'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
 
-// Atenuado até o desenho do mapa vir com a identidade visual (plano, 2026-10-29): sem cor e um
-// pouco mais claro, para a rota e os marcadores se destacarem. O contraste fica o do OSM, para as
-// ruas e os nomes continuarem legíveis (teste do usuário, 2026-10-30).
-const ATENUADO = {
-  'raster-saturation': -1,
-  'raster-brightness-min': 0.15,
-  'raster-contrast': 0,
-}
-
 const ESTILO: NonNullable<MapOptions['style']> = {
   version: 8,
   sources: {
     osm: {
       type: 'raster',
-      tiles: [TILES],
+      tiles: [tingido(TILES)],
       tileSize: 256,
       maxzoom: 19,
       attribution:
         '<a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">© OpenStreetMap contributors</a>',
     },
   },
-  layers: [{ id: 'osm', type: 'raster', source: 'osm', paint: ATENUADO }],
+  layers: [{ id: 'osm', type: 'raster', source: 'osm' }],
 }
 
 const SEM_ROTA = { type: 'FeatureCollection' as const, features: [] }
@@ -116,6 +109,7 @@ export function Mapa({ origem, destino, rota, aoTocar, aoCancelar }: Props) {
   useEffect(() => {
     const container = elemento.current
     if (!container) return
+    registrarTinta()
     const novo = new MapLibreMap({
       container,
       style: ESTILO,
