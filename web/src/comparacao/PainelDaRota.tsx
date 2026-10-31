@@ -114,7 +114,7 @@ export function PainelDaRota({
           <svg width="28" height="8" viewBox="0 0 28 8" aria-hidden="true">
             <path
               d="M2,4 L26,4"
-              stroke="#6E6E6E"
+              stroke="#594927"
               strokeWidth="3"
               strokeDasharray="6 4"
             />

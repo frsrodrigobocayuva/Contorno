@@ -4,8 +4,8 @@
 import { expect, test, type Page } from '@playwright/test'
 
 type Cor = [number, number, number]
-const CINZA_DA_IRRESTRITA: Cor = [0x6e, 0x6e, 0x6e]
-const DESTAQUE_DA_RESTRITA: Cor = [0x59, 0x49, 0x27]
+// As duas rotas vão na cor de destaque: a irrestrita tracejada, a restrita em linha cheia.
+const DESTAQUE: Cor = [0x59, 0x49, 0x27]
 
 // Os pixels do mapa com a cor pedida, em coordenadas da página. A captura é lida no próprio
 // navegador, sem biblioteca de imagem.
@@ -70,13 +70,13 @@ test('desenhar uma área sobre a rota devolve a rota restrita com o custo', asyn
 
   // A rota normal aparece no mapa: o meio dela é onde a área vai cortar.
   await expect
-    .poll(async () => (await pixels(page, CINZA_DA_IRRESTRITA)).length, {
+    .poll(async () => (await pixels(page, DESTAQUE)).length, {
       timeout: 20_000,
     })
     .toBeGreaterThan(150)
-  const rota = await pixels(page, CINZA_DA_IRRESTRITA)
+  const rota = await pixels(page, DESTAQUE)
   const meio = rota.sort((a, b) => a.y - b.y)[Math.floor(rota.length / 2)]
-  const antes = (await pixels(page, DESTAQUE_DA_RESTRITA)).length
+  const antes = rota.length
 
   await page.getByRole('button', { name: 'Desenhar área' }).click()
   await expect(page.getByText('Desenhar área proibida')).toBeVisible()
@@ -100,9 +100,10 @@ test('desenhar uma área sobre a rota devolve a rota restrita com o custo', asyn
   await expect(page.getByText('1 restrição aplicada')).toBeVisible()
   // O custo tem sinal: a restrita pode sair mais curta, mas nunca mais rápida que a irrestrita.
   await expect(page.getByText(/^\+\d+ min · [+−]/)).toBeVisible()
-  // A rota restrita está desenhada no mapa, na cor de destaque.
+  // A rota restrita está desenhada no mapa: em linha cheia, ela acrescenta pixels da cor de
+  // destaque aos da irrestrita tracejada.
   await expect
-    .poll(async () => (await pixels(page, DESTAQUE_DA_RESTRITA)).length, {
+    .poll(async () => (await pixels(page, DESTAQUE)).length, {
       timeout: 20_000,
     })
     .toBeGreaterThan(antes + 300)

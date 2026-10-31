@@ -145,17 +145,20 @@ function App() {
     setEtapa('rota')
   }, [])
 
-  // No desenho e na conferência, o Esc desiste só da área; nas outras telas, cancela a rota.
+  // O Esc desfaz um nível por vez: no desenho e na conferência, desiste só da área; nas outras
+  // telas, cancela a rota; com tudo vazio, volta para a abertura (teste do usuário, 2026-10-31).
+  const vazio = !origem && !destino && areas.length === 0
   useEffect(() => {
     if (etapa === 'abertura') return
     function aoTeclar(evento: KeyboardEvent) {
       if (evento.key !== 'Escape') return
       if (etapa === 'desenhar' || etapa === 'conferir') sairDaArea()
+      else if (etapa === 'pontos' && vazio) setEtapa('abertura')
       else cancelar()
     }
     window.addEventListener('keydown', aoTeclar)
     return () => window.removeEventListener('keydown', aoTeclar)
-  }, [etapa, cancelar, sairDaArea])
+  }, [etapa, vazio, cancelar, sairDaArea])
 
   function marcar(campo: Campo, ponto: Ponto) {
     if (campo === 'origem') {
@@ -169,8 +172,10 @@ function App() {
     setAviso(null)
   }
 
+  // Na abertura, um toque no mapa (sem arrastar) faz o mesmo que Começar, sem marcar ponto.
   function tocarNoMapa(coordenadas: Coordenadas) {
-    if (etapa === 'pontos')
+    if (etapa === 'abertura') setEtapa('pontos')
+    else if (etapa === 'pontos')
       marcar(campoAtivo, { nome: PONTO_NO_MAPA, coordenadas })
   }
 
