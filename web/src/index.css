@@ -1,5 +1,5 @@
-/* Identidade neutra até a escolha de cor, fonte e logotipo (plano, D19): preto, cinzas e a fonte
-   do sistema, como o protótipo do MVP. */
+/* Identidade mínima (plano, D19 e 2026-10-30): a interface fica neutra, em preto, branco e cinzas,
+   com a Atkinson Hyperlegible; a cor fica no mapa, com fundo areia e a rota restrita em marrom. */
 :root {
   --tinta: #1a1a1a;
   --tinta-suave: #595959;
@@ -7,8 +7,9 @@
   --borda-forte: #9e9e9e;
   --fundo: #ffffff;
   --fundo-suave: #f4f4f4;
-  --mapa: #ededed;
-  font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
+  --mapa: #edd8af;
+  font-family:
+    'Atkinson Hyperlegible', system-ui, 'Segoe UI', Roboto, sans-serif;
   font-size: 15px;
   color: var(--tinta);
   background: var(--fundo);
