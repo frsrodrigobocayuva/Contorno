@@ -7,7 +7,6 @@ import { areaDoDesenho, diferencaPercentual } from './areas'
 
 interface PainelDoDesenhoProps {
   vertices: Coordenadas[]
-  podeDesfazer: boolean
   conferindo: boolean
   erro: string | null
   aoDesfazer: () => void
@@ -16,7 +15,6 @@ interface PainelDoDesenhoProps {
 
 export function PainelDoDesenho({
   vertices,
-  podeDesfazer,
   conferindo,
   erro,
   aoDesfazer,
@@ -38,10 +36,10 @@ export function PainelDoDesenho({
         <button
           type="button"
           className="botao"
-          disabled={!podeDesfazer || conferindo}
+          disabled={pontos === 0 || conferindo}
           onClick={aoDesfazer}
         >
-          Desfazer ponto
+          Desfazer área
         </button>
         <button
           type="button"

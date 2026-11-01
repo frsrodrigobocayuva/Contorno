@@ -6,23 +6,35 @@ import type {
   RespostaArea,
   RestricaoArea,
 } from '../api/cliente'
+import type { Ponto } from '../pontos'
+
+// A área de raio guarda o centro e a distância, para "Ajustar raio" voltar à tela 08.
+export interface RaioDaArea {
+  centro: Ponto
+  metros: number
+}
 
 export interface AreaDeclarada {
   id: string
   rotulo: string
   desenho: Coordenadas[]
+  raio?: RaioDaArea
   celulas: string[]
   contorno: Contorno
   areaDesenhadaM2: number
   areaProibidaM2: number
 }
 
-// Sem nome, a área vira "Área N", com o menor N livre (plano, A8).
-export function rotuloPadrao(areas: AreaDeclarada[]): string {
+// Sem nome, a área vira "Área N", com o menor N livre (plano, A8); a de raio, "Raio N", com
+// numeração própria (escolha do usuário, S5-04).
+export function rotuloPadrao(
+  areas: AreaDeclarada[],
+  prefixo: 'Área' | 'Raio' = 'Área',
+): string {
   const usados = new Set(areas.map((a) => a.rotulo))
   let n = 1
-  while (usados.has(`Área ${n}`)) n++
-  return `Área ${n}`
+  while (usados.has(`${prefixo} ${n}`)) n++
+  return `${prefixo} ${n}`
 }
 
 export function novaArea(
@@ -31,11 +43,13 @@ export function novaArea(
   rotuloSemNome: string,
   desenho: Coordenadas[],
   resposta: RespostaArea,
+  raio?: RaioDaArea,
 ): AreaDeclarada {
   return {
     id,
     rotulo: nome.trim() || rotuloSemNome,
     desenho,
+    raio,
     celulas: resposta.celulas,
     contorno: resposta.contorno,
     areaDesenhadaM2: resposta.areaDesenhadaM2,
@@ -73,4 +87,23 @@ export function areaDoDesenho(vertices: Coordenadas[]): number {
       (lon2 - lon1) * rad * (2 + Math.sin(lat1 * rad) + Math.sin(lat2 * rad))
   }
   return Math.abs((soma * RAIO_DA_TERRA_M * RAIO_DA_TERRA_M) / 2)
+}
+
+// Prévia do círculo enquanto o raio é ajustado (tela 08), num plano local em metros. A área que
+// vale é a do servidor, construída na UTM 22S (Realização, UC02); a diferença não chega a 1 m.
+export function circuloAproximado(
+  [longitude, latitude]: Coordenadas,
+  metros: number,
+  lados = 64,
+): Coordenadas[] {
+  const porGrauDeLatitude = (Math.PI / 180) * RAIO_DA_TERRA_M
+  const porGrauDeLongitude =
+    porGrauDeLatitude * Math.cos((latitude * Math.PI) / 180)
+  return Array.from({ length: lados }, (_, i) => {
+    const angulo = (2 * Math.PI * i) / lados
+    return [
+      longitude + (metros * Math.cos(angulo)) / porGrauDeLongitude,
+      latitude + (metros * Math.sin(angulo)) / porGrauDeLatitude,
+    ]
+  })
 }

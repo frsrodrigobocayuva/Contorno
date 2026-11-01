@@ -42,7 +42,7 @@ test('ponto fora da região é recusado, e o desenho continua', async ({
   await expect(page.getByText(/Esse ponto fica fora/)).toBeVisible()
   await expect(page.getByText('2 pontos marcados')).toBeVisible()
   await expect(
-    page.getByRole('button', { name: 'Desfazer ponto' }),
+    page.getByRole('button', { name: 'Desfazer área' }),
   ).toBeEnabled()
 
   await tocar(page, meio.x, meio.y + 50)
@@ -93,7 +93,7 @@ test('o toque fora da região não marca A nem B', async ({ page }) => {
   await expect(page.getByText('Fora da região atendida')).toBeHidden()
 })
 
-test('com o desenho fechado, desfazer tira o último ponto', async ({
+test('Desfazer área apaga o desenho, também o carregado em Ajustar', async ({
   page,
 }) => {
   const mapa = await ateODesenho(page)
@@ -104,19 +104,28 @@ test('com o desenho fechado, desfazer tira o último ponto', async ({
     [60, 60],
     [-60, 60],
   ]
+  await expect(
+    page.getByRole('button', { name: 'Desfazer área' }),
+  ).toBeDisabled()
+  for (const [dx, dy] of cantos.slice(0, 3))
+    await tocar(page, meio.x + dx, meio.y + dy)
+  await expect(page.getByText('3 pontos marcados')).toBeVisible()
+
+  await page.getByRole('button', { name: 'Desfazer área' }).click()
+  await expect(page.getByText('0 pontos marcados')).toBeVisible()
+
+  // Recomeça do zero e fecha no primeiro ponto.
   for (const [dx, dy] of cantos) await tocar(page, meio.x + dx, meio.y + dy)
-  // Tocar de novo no primeiro ponto fecha o desenho e leva à conferência.
   await tocar(page, meio.x + cantos[0][0], meio.y + cantos[0][1])
   await expect(page.getByText('Confira a área proibida')).toBeVisible()
 
-  // Ajustar traz o desenho fechado de volta: o histórico do editor acabou, mas desfazer funciona.
+  // Em Ajustar, a área volta carregada; Desfazer área apaga também essa.
   await page.getByRole('button', { name: 'Ajustar' }).click()
   await expect(page.getByText('4 pontos marcados')).toBeVisible()
-  await page.getByRole('button', { name: 'Desfazer ponto' }).click()
-  await expect(page.getByText('3 pontos marcados')).toBeVisible()
-  await expect(
-    page.getByRole('button', { name: 'Desfazer ponto' }),
-  ).toBeDisabled()
+  await page.getByRole('button', { name: 'Desfazer área' }).click()
+  await expect(page.getByText('0 pontos marcados')).toBeVisible()
+  for (const [dx, dy] of cantos.slice(0, 3))
+    await tocar(page, meio.x + dx, meio.y + dy)
   await page.getByRole('button', { name: 'Concluir área' }).click()
   await expect(page.getByText('Confira a área proibida')).toBeVisible()
 })

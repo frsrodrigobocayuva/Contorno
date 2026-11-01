@@ -28,20 +28,17 @@ vi.mock('./mapa/Mapa', async () => {
       aoCancelar?: () => void
       areas?: { id: string; rotuloApontado?: string }[]
       desenho?: object | null
-      aoMudarDesenho?: (estado: {
-        vertices: [number, number][]
-        podeDesfazer: boolean
-      }) => void
+      aoMudarDesenho?: (estado: { vertices: [number, number][] }) => void
       aoFecharDesenho?: (vertices: [number, number][]) => void
       aoRecusarDesenho?: (motivo: 'FORA_DA_REGIAO' | 'DESENHO_CRUZADO') => void
       ref?: import('react').Ref<{
-        desfazer: () => void
+        desfazerArea: () => void
         vertices: () => [number, number][]
       }>
     }) => {
       useImperativeHandle(
         ref,
-        () => ({ desfazer: () => {}, vertices: () => VERTICES }),
+        () => ({ desfazerArea: () => {}, vertices: () => VERTICES }),
         [],
       )
       return (
@@ -68,9 +65,7 @@ vi.mock('./mapa/Mapa', async () => {
             <>
               <button
                 type="button"
-                onClick={() =>
-                  aoMudarDesenho?.({ vertices: VERTICES, podeDesfazer: true })
-                }
+                onClick={() => aoMudarDesenho?.({ vertices: VERTICES })}
               >
                 marcar cantos
               </button>
@@ -88,7 +83,6 @@ vi.mock('./mapa/Mapa', async () => {
                 onClick={() =>
                   aoMudarDesenho?.({
                     vertices: VERTICES.slice(0, 2),
-                    podeDesfazer: true,
                   })
                 }
               >
@@ -265,7 +259,7 @@ describe('App', () => {
     expect(calcular).toBeEnabled()
   })
 
-  it('calcula e mostra a rota normal, com só o raio em breve', async () => {
+  it('calcula e mostra a rota normal, com as três restrições disponíveis', async () => {
     const fetch = api([[/^\/rotas\/calculo$/, () => json(ROTA)]])
     comecar()
     marcarOrigemEDestino()
@@ -278,7 +272,10 @@ describe('App', () => {
     expect(
       screen.getByRole('button', { name: /Classes de via a evitar/ }),
     ).toBeEnabled()
-    expect(screen.getAllByText('em breve')).toHaveLength(1)
+    expect(
+      screen.getByRole('button', { name: /Raio a partir de endereço/ }),
+    ).toBeEnabled()
+    expect(screen.queryByText('em breve')).not.toBeInTheDocument()
     const corpo = JSON.parse(fetch.mock.calls[0][1]!.body as string)
     expect(corpo).toEqual({
       origem: [-51.15, -29.79],
@@ -417,16 +414,47 @@ describe('App', () => {
       deveEstarVazio()
     })
 
-    it('o Esc cancela, também na rota', async () => {
+    async function comRotaCalculada() {
       api([[/^\/rotas\/calculo$/, () => json(ROTA)]])
       comecar()
       marcarOrigemEDestino()
       fireEvent.click(screen.getByRole('button', { name: 'Calcular rota' }))
       await screen.findByText('13 min · 12,8 km')
+    }
+
+    it('com rota, o Esc pergunta antes; outro Esc continua aqui', async () => {
+      await comRotaCalculada()
 
       fireEvent.keyDown(window, { key: 'Escape' })
 
+      const janela = screen.getByRole('dialog', { name: 'Cancelar a rota?' })
+      expect(
+        within(janela).getByRole('button', { name: 'Continuar aqui' }),
+      ).toHaveFocus()
+      fireEvent.keyDown(window, { key: 'Escape' })
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+      expect(screen.getByText('13 min · 12,8 km')).toBeInTheDocument()
+
+      fireEvent.keyDown(window, { key: 'Escape' })
+      fireEvent.click(
+        within(screen.getByRole('dialog')).getByRole('button', {
+          name: 'Cancelar rota',
+        }),
+      )
       deveEstarVazio()
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    })
+
+    it('com rota, o duplo clique pergunta antes; Continuar aqui mantém tudo', async () => {
+      await comRotaCalculada()
+
+      fireEvent.click(
+        screen.getByRole('button', { name: 'duplo clique no mapa' }),
+      )
+      fireEvent.click(screen.getByRole('button', { name: 'Continuar aqui' }))
+
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+      expect(screen.getByText('13 min · 12,8 km')).toBeInTheDocument()
     })
 
     it('o duplo clique no mapa cancela, mas não existe na abertura', () => {
@@ -719,7 +747,7 @@ describe('App', () => {
       expect(screen.getByText(/Esse ponto fica fora/)).toBeInTheDocument()
       expect(screen.getByText('Desenhar área proibida')).toBeInTheDocument()
       expect(
-        screen.getByRole('button', { name: 'Desfazer ponto' }),
+        screen.getByRole('button', { name: 'Desfazer área' }),
       ).toBeEnabled()
 
       // Um ponto a menos (desfazer) tira o aviso.
@@ -875,6 +903,138 @@ describe('App', () => {
           screen.getByRole('group', { name: /^Rua residencial/ }),
         ).getByRole('radio', { name: 'Indiferente' }),
       ).toBeChecked()
+    })
+  })
+  describe('raio a partir de endereço (S5-04)', () => {
+    const CIRCULO = Array.from({ length: 64 }, (_, i): [number, number] => [
+      -51.15 + 0.005 * Math.cos((2 * Math.PI * i) / 64),
+      -29.79 + 0.005 * Math.sin((2 * Math.PI * i) / 64),
+    ])
+    const AREA_DO_RAIO = {
+      celulas: ['8ba8b4b2c9a5fff'],
+      contorno: {
+        type: 'MultiPolygon',
+        coordinates: [[[...CIRCULO, CIRCULO[0]]]],
+      },
+      desenho: CIRCULO,
+      areaDesenhadaM2: 785_000,
+      areaProibidaM2: 900_000,
+      conflitos: [] as string[],
+    }
+    type Corpo = {
+      raio?: { centro: [number, number]; metros: number }
+      restricoes?: { rotulo: string }[]
+    }
+    const corpo = (opcoes?: RequestInit) =>
+      JSON.parse(opcoes!.body as string) as Corpo
+
+    async function ateORaio() {
+      const fetch = api([
+        [/^\/restricoes\/area$/, () => json(AREA_DO_RAIO)],
+        [/^\/rotas\/calculo$/, () => json(ROTA)],
+      ])
+      comecar()
+      marcarOrigemEDestino()
+      fireEvent.click(screen.getByRole('button', { name: 'Calcular rota' }))
+      fireEvent.click(
+        await screen.findByRole('button', {
+          name: /Raio a partir de endereço/,
+        }),
+      )
+      return fetch
+    }
+
+    it('o toque marca o centro, e Gerar área manda o centro e a distância', async () => {
+      const fetch = await ateORaio()
+      expect(screen.getByText('Raio a partir de endereço')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Gerar área' })).toBeDisabled()
+
+      fireEvent.click(screen.getByRole('button', { name: 'tocar no mapa' }))
+      fireEvent.change(screen.getByLabelText(/Distância/), {
+        target: { value: '1500' },
+      })
+      expect(screen.getByText('1,5 km')).toBeInTheDocument()
+      fireEvent.click(screen.getByRole('button', { name: 'Gerar área' }))
+
+      expect(
+        await screen.findByText('Confira a área proibida'),
+      ).toBeInTheDocument()
+      const pedido = fetch.mock.calls.find(
+        ([url]) => url === '/restricoes/area',
+      )![1]
+      expect(corpo(pedido).raio).toEqual({
+        centro: [-51.15, -29.79],
+        metros: 1500,
+      })
+      expect(screen.getByLabelText('Nome da área (opcional)')).toHaveAttribute(
+        'placeholder',
+        'Raio 1',
+      )
+
+      fireEvent.click(
+        screen.getByRole('button', { name: 'Confirmar e recalcular' }),
+      )
+      fireEvent.click(
+        await screen.findByRole('button', { name: /Ver restrições/ }),
+      )
+      expect(screen.getByText('Raio 1')).toBeInTheDocument()
+      expect(screen.getByText(/raio de 1,5 km/)).toBeInTheDocument()
+
+      // Ajustar raio volta à tela 08 com o centro e a distância.
+      fireEvent.click(screen.getByRole('button', { name: 'Ajustar raio' }))
+      expect(screen.getByText('Raio a partir de endereço')).toBeInTheDocument()
+      expect(screen.getByLabelText(/Distância/)).toHaveValue('1500')
+      expect(screen.getByLabelText('Endereço do centro')).toHaveValue(
+        'Ponto marcado no mapa',
+      )
+    })
+
+    it('o centro fora da região é recusado, e o Esc sai do raio sem cancelar a rota', async () => {
+      await ateORaio()
+
+      fireEvent.click(
+        screen.getByRole('button', { name: 'tocar no mapa fora da região' }),
+      )
+
+      expect(screen.getByText(/Escolha um centro dentro/)).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Gerar área' })).toBeDisabled()
+
+      fireEvent.keyDown(window, { key: 'Escape' })
+      expect(screen.getByText('nenhuma restrição')).toBeInTheDocument()
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    })
+
+    it('o círculo que passa da região avisa e fica na tela do raio', async () => {
+      api([
+        [
+          /^\/restricoes\/area$/,
+          () =>
+            json(
+              {
+                codigo: 'VALIDACAO',
+                mensagem: 'x',
+                detalhes: [{ campo: 'raio', motivo: 'FORA_DA_REGIAO' }],
+              },
+              422,
+            ),
+        ],
+        [/^\/rotas\/calculo$/, () => json(ROTA)],
+      ])
+      comecar()
+      marcarOrigemEDestino()
+      fireEvent.click(screen.getByRole('button', { name: 'Calcular rota' }))
+      fireEvent.click(
+        await screen.findByRole('button', {
+          name: /Raio a partir de endereço/,
+        }),
+      )
+      fireEvent.click(screen.getByRole('button', { name: 'tocar no mapa' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Gerar área' }))
+
+      expect(
+        await screen.findByText(/O círculo passa de São Leopoldo/),
+      ).toBeInTheDocument()
+      expect(screen.getByText('Raio a partir de endereço')).toBeInTheDocument()
     })
   })
 })

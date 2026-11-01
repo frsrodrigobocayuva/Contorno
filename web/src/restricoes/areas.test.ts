@@ -3,6 +3,7 @@ import type { Coordenadas } from '../api/cliente'
 import { formatarArea, formatarCusto } from '../formato'
 import {
   areaDoDesenho,
+  circuloAproximado,
   diferencaPercentual,
   novaArea,
   paraRestricoes,
@@ -14,6 +15,7 @@ import { recusaDoDesenho, verticesDoDesenho } from './editor'
 const RESPOSTA = {
   celulas: ['8ba8b4b2c9a5fff'],
   contorno: { type: 'MultiPolygon' as const, coordinates: [] },
+  desenho: [],
   areaDesenhadaM2: 910_000,
   areaProibidaM2: 1_092_000,
   conflitos: [],
@@ -28,6 +30,30 @@ const DESENHO: Coordenadas[] = [
 function area(rotulo: string): AreaDeclarada {
   return novaArea(rotulo, rotulo, 'x', DESENHO, RESPOSTA)
 }
+
+describe('áreas de raio (S5-04)', () => {
+  it('sem nome, a área de raio vira "Raio N", com numeração própria', () => {
+    expect(rotuloPadrao([], 'Raio')).toBe('Raio 1')
+    expect(rotuloPadrao([area('Área 1'), area('Raio 1')], 'Raio')).toBe(
+      'Raio 2',
+    )
+    expect(rotuloPadrao([area('Raio 1')])).toBe('Área 1')
+  })
+
+  it('a prévia do círculo tem 64 pontos à distância pedida do centro', () => {
+    const centro: Coordenadas = [-51.1478, -29.7602]
+    const circulo = circuloAproximado(centro, 500)
+    // Distância aproximada em metros, num plano local.
+    const metros = ([lon, lat]: Coordenadas) =>
+      Math.hypot(
+        (lon - centro[0]) * 111_320 * Math.cos((centro[1] * Math.PI) / 180),
+        (lat - centro[1]) * 111_320,
+      )
+
+    expect(circulo).toHaveLength(64)
+    for (const ponto of circulo) expect(metros(ponto)).toBeCloseTo(500, -1)
+  })
+})
 
 describe('áreas da consulta', () => {
   it('sem nome, a área vira "Área N" com o menor N livre', () => {

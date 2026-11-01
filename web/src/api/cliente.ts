@@ -76,15 +76,20 @@ export function calcularRota(
 }
 
 // UC02: o desenho vira a área proibida, com as células, o contorno e os conflitos.
+// O desenho do usuário ou o raio sobre um ponto, um dos dois (UC02 e alternativo A).
+export type FormaDaArea =
+  | { poligono: Coordenadas[] }
+  | { raio: { centro: Coordenadas; metros: number } }
+
 export function definirArea(
-  poligono: Coordenadas[],
+  forma: FormaDaArea,
   origem?: Coordenadas,
   destino?: Coordenadas,
 ): Promise<RespostaArea> {
   return pedir('/restricoes/area', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ poligono, origem, destino }),
+    body: JSON.stringify({ ...forma, origem, destino }),
   })
 }
 

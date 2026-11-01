@@ -1,7 +1,7 @@
 // Restrições da consulta (tela 07): cada área com redesenhar e remover. Com o diagnóstico só
 // informativo, remover a área na mão é o caminho depois de um bloqueio (plano, S5-03); as áreas
 // que o diagnóstico apontou levam a etiqueta "bloqueia o trajeto" até o próximo cálculo.
-import { formatarArea } from '../formato'
+import { formatarArea, formatarDistancia } from '../formato'
 import type { AreaDeclarada } from './areas'
 import type { preferenciasAtivas } from './classes'
 
@@ -42,7 +42,10 @@ export function ListaDeRestricoes({
                 <div className="nome-da-area">
                   <strong>{area.rotulo}</strong>
                   <span className="dica">
-                    desenhada · {formatarArea(area.areaProibidaM2)} proibidos
+                    {area.raio
+                      ? `raio de ${formatarDistancia(area.raio.metros)}`
+                      : 'desenhada'}{' '}
+                    · {formatarArea(area.areaProibidaM2)} proibidos
                   </span>
                 </div>
                 {apontadas.includes(area.id) && (
@@ -55,7 +58,7 @@ export function ListaDeRestricoes({
                   className="botao"
                   onClick={() => aoRedesenhar(area.id)}
                 >
-                  Redesenhar
+                  {area.raio ? 'Ajustar raio' : 'Redesenhar'}
                 </button>
                 <button
                   type="button"

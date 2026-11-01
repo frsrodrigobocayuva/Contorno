@@ -37,8 +37,9 @@ export interface paths {
          * Definir Area
          * @description As células da área, o contorno delas e os conflitos com a origem e o destino (UC02).
          *
-         *     Recusa, antes do domínio (DAS 6.10), desenho fora de São Leopoldo e Novo Hamburgo, com menos
-         *     de três vértices distintos ou que se cruza.
+         *     Recusa, antes do domínio (DAS 6.10): pedido sem o desenho e sem o raio, ou com os dois;
+         *     desenho fora de São Leopoldo e Novo Hamburgo, com menos de três vértices distintos ou que se
+         *     cruza; raio fora dos limites, com o centro fora da região ou com o círculo passando dela.
          */
         post: operations["definir_area_restricoes_area_post"];
         delete?: never;
@@ -170,17 +171,19 @@ export interface components {
         NivelDeEvitacao: "INDIFERENTE" | "EVITAR" | "EVITAR_FORTEMENTE";
         /**
          * PedidoDeArea
-         * @description Desenho do usuário (UC02) e, se já escolhidos, a origem e o destino da consulta.
+         * @description O desenho do usuário ou o raio sobre um ponto, um dos dois (UC02), e, se já escolhidos, a
+         *     origem e o destino da consulta.
          */
         PedidoDeArea: {
             /**
              * Poligono
              * @description Vértices do desenho, em ordem, sem repetir o primeiro no fim.
              */
-            poligono: [
+            poligono?: [
                 number,
                 number
-            ][];
+            ][] | null;
+            raio?: components["schemas"]["RaioDTO"] | null;
             /** Origem */
             origem?: [
                 number,
@@ -211,6 +214,22 @@ export interface components {
             restricoes?: (components["schemas"]["RestricaoArea"] | components["schemas"]["RestricaoVia"])[];
         };
         /**
+         * RaioDTO
+         * @description Raio a partir de um ponto (UC02, alternativo A): o centro vem da busca ou de um toque.
+         */
+        RaioDTO: {
+            /** Centro */
+            centro: [
+                number,
+                number
+            ];
+            /**
+             * Metros
+             * @description Distância do centro, em metros (100 m a 2 km, D11).
+             */
+            metros: number;
+        };
+        /**
          * RespostaArea
          * @description A área proibida para o usuário conferir (UC02; RN04).
          */
@@ -221,6 +240,14 @@ export interface components {
              */
             celulas: string[];
             contorno: components["schemas"]["MultiPoligonoGeoJSON"];
+            /**
+             * Desenho
+             * @description O que as células cobrem: o desenho ou o círculo do raio, sem repetir o primeiro ponto no fim. A tela o mostra sob o contorno (RN04).
+             */
+            desenho: [
+                number,
+                number
+            ][];
             /** Areadesenhadam2 */
             areaDesenhadaM2: number;
             /** Areaproibidam2 */

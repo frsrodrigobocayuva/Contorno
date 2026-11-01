@@ -72,7 +72,7 @@
     "/restricoes/area": {
       "post": {
         "summary": "Definir Area",
-        "description": "As células da área, o contorno delas e os conflitos com a origem e o destino (UC02).\n\nRecusa, antes do domínio (DAS 6.10), desenho fora de São Leopoldo e Novo Hamburgo, com menos\nde três vértices distintos ou que se cruza.",
+        "description": "As células da área, o contorno delas e os conflitos com a origem e o destino (UC02).\n\nRecusa, antes do domínio (DAS 6.10): pedido sem o desenho e sem o raio, ou com os dois;\ndesenho fora de São Leopoldo e Novo Hamburgo, com menos de três vértices distintos ou que se\ncruza; raio fora dos limites, com o centro fora da região ou com o círculo passando dela.",
         "operationId": "definir_area_restricoes_area_post",
         "requestBody": {
           "content": {
@@ -366,28 +366,45 @@
       "PedidoDeArea": {
         "properties": {
           "poligono": {
-            "items": {
-              "prefixItems": [
-                {
-                  "type": "number",
-                  "maximum": 180.0,
-                  "minimum": -180.0
+            "anyOf": [
+              {
+                "items": {
+                  "prefixItems": [
+                    {
+                      "type": "number",
+                      "maximum": 180.0,
+                      "minimum": -180.0
+                    },
+                    {
+                      "type": "number",
+                      "maximum": 90.0,
+                      "minimum": -90.0
+                    }
+                  ],
+                  "type": "array",
+                  "maxItems": 2,
+                  "minItems": 2
                 },
-                {
-                  "type": "number",
-                  "maximum": 90.0,
-                  "minimum": -90.0
-                }
-              ],
-              "type": "array",
-              "maxItems": 2,
-              "minItems": 2
-            },
-            "type": "array",
-            "maxItems": 500,
-            "minItems": 3,
+                "type": "array",
+                "maxItems": 500,
+                "minItems": 3
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Poligono",
             "description": "Vértices do desenho, em ordem, sem repetir o primeiro no fim."
+          },
+          "raio": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RaioDTO"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "origem": {
             "anyOf": [
@@ -442,11 +459,8 @@
         },
         "additionalProperties": false,
         "type": "object",
-        "required": [
-          "poligono"
-        ],
         "title": "PedidoDeArea",
-        "description": "Desenho do usuário (UC02) e, se já escolhidos, a origem e o destino da consulta."
+        "description": "O desenho do usuário ou o raio sobre um ponto, um dos dois (UC02), e, se já escolhidos, a\norigem e o destino da consulta."
       },
       "PedidoDeRota": {
         "properties": {
@@ -517,6 +531,41 @@
         ],
         "title": "PedidoDeRota"
       },
+      "RaioDTO": {
+        "properties": {
+          "centro": {
+            "prefixItems": [
+              {
+                "type": "number",
+                "maximum": 180.0,
+                "minimum": -180.0
+              },
+              {
+                "type": "number",
+                "maximum": 90.0,
+                "minimum": -90.0
+              }
+            ],
+            "type": "array",
+            "maxItems": 2,
+            "minItems": 2,
+            "title": "Centro"
+          },
+          "metros": {
+            "type": "number",
+            "title": "Metros",
+            "description": "Distância do centro, em metros (100 m a 2 km, D11)."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "centro",
+          "metros"
+        ],
+        "title": "RaioDTO",
+        "description": "Raio a partir de um ponto (UC02, alternativo A): o centro vem da busca ou de um toque."
+      },
       "RespostaArea": {
         "properties": {
           "celulas": {
@@ -529,6 +578,28 @@
           },
           "contorno": {
             "$ref": "#/components/schemas/MultiPoligonoGeoJSON"
+          },
+          "desenho": {
+            "items": {
+              "prefixItems": [
+                {
+                  "type": "number",
+                  "maximum": 180.0,
+                  "minimum": -180.0
+                },
+                {
+                  "type": "number",
+                  "maximum": 90.0,
+                  "minimum": -90.0
+                }
+              ],
+              "type": "array",
+              "maxItems": 2,
+              "minItems": 2
+            },
+            "type": "array",
+            "title": "Desenho",
+            "description": "O que as células cobrem: o desenho ou o círculo do raio, sem repetir o primeiro ponto no fim. A tela o mostra sob o contorno (RN04)."
           },
           "areaDesenhadaM2": {
             "type": "number",
@@ -552,6 +623,7 @@
         "required": [
           "celulas",
           "contorno",
+          "desenho",
           "areaDesenhadaM2",
           "areaProibidaM2",
           "conflitos"
