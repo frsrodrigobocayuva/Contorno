@@ -52,6 +52,47 @@ test('ponto fora da região é recusado, e o desenho continua', async ({
   await expect(page.getByText('Confira a área proibida')).toBeVisible()
 })
 
+test('o primeiro ponto fora da região não trava o desenho', async ({
+  page,
+}) => {
+  const mapa = await ateODesenho(page)
+  for (let i = 0; i < 6; i++) {
+    await page.getByRole('button', { name: 'Zoom out' }).click()
+    await page.waitForTimeout(300)
+  }
+  const meio = { x: mapa.x + mapa.width / 2, y: mapa.y + mapa.height / 2 }
+
+  // Antes, o primeiro ponto fora ficava no desenho, e todo ponto seguinte era recusado.
+  await tocar(page, mapa.x + 12, mapa.y + 12)
+  await expect(page.getByText(/Esse ponto fica fora/)).toBeVisible()
+  await expect(page.getByText('0 pontos marcados')).toBeVisible()
+
+  await tocar(page, meio.x - 60, meio.y - 40)
+  await tocar(page, meio.x + 60, meio.y - 40)
+  await tocar(page, meio.x, meio.y + 50)
+  await expect(page.getByText('3 pontos marcados')).toBeVisible()
+  await expect(page.getByText(/Esse ponto fica fora/)).toBeHidden()
+})
+
+test('o toque fora da região não marca A nem B', async ({ page }) => {
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Começar' }).click()
+  const mapa = await page.getByRole('region', { name: 'Mapa' }).boundingBox()
+  if (!mapa) throw new Error('mapa sem caixa')
+  for (let i = 0; i < 6; i++) {
+    await page.getByRole('button', { name: 'Zoom out' }).click()
+    await page.waitForTimeout(300)
+  }
+
+  await tocar(page, mapa.x + 12, mapa.y + 12)
+  await expect(page.getByText('Fora da região atendida')).toBeVisible()
+  await expect(page.locator('.marcador')).toHaveCount(0)
+
+  await tocar(page, mapa.x + mapa.width / 2, mapa.y + mapa.height / 2)
+  await expect(page.locator('.marcador[aria-label="Origem"]')).toHaveCount(1)
+  await expect(page.getByText('Fora da região atendida')).toBeHidden()
+})
+
 test('com o desenho fechado, desfazer tira o último ponto', async ({
   page,
 }) => {

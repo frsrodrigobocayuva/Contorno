@@ -21,6 +21,7 @@ import {
 } from './comparacao/PainelDoDiagnostico'
 import { CampoDeEndereco } from './mapa/CampoDeEndereco'
 import { Mapa, type AreaNoMapa, type ControleDoMapa } from './mapa/Mapa'
+import { naRegiao } from './mapa/regiao'
 import { PONTO_NO_MAPA, type Campo, type Ponto } from './pontos'
 import {
   novaArea,
@@ -220,11 +221,13 @@ function App() {
     setDiagnostico(null)
   }
 
-  // Na abertura, um toque no mapa (sem arrastar) faz o mesmo que Começar, sem marcar ponto.
+  // Na abertura, um toque no mapa (sem arrastar) faz o mesmo que Começar, sem marcar ponto. Fora
+  // da região atendida, o toque não marca A nem B, como no desenho da área (2026-11-01).
   function tocarNoMapa(coordenadas: Coordenadas) {
     if (etapa === 'abertura') setEtapa('pontos')
-    else if (etapa === 'pontos')
-      marcar(campoAtivo, { nome: PONTO_NO_MAPA, coordenadas })
+    else if (etapa !== 'pontos') return
+    else if (!naRegiao(coordenadas)) setAviso(FORA_DA_REGIAO)
+    else marcar(campoAtivo, { nome: PONTO_NO_MAPA, coordenadas })
   }
 
   async function calcular(

@@ -49,6 +49,9 @@ vi.mock('./mapa/Mapa', async () => {
           <button type="button" onClick={() => aoTocar?.([-51.15, -29.79])}>
             tocar no mapa
           </button>
+          <button type="button" onClick={() => aoTocar?.([-51.25, -29.7])}>
+            tocar no mapa fora da região
+          </button>
           {aoCancelar && (
             <button type="button" onClick={aoCancelar}>
               duplo clique no mapa
@@ -154,6 +157,25 @@ afterEach(() => {
 })
 
 describe('App', () => {
+  it('o toque fora da região não marca A nem B e avisa', () => {
+    comecar()
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'tocar no mapa fora da região' }),
+    )
+
+    expect(screen.getByText('Fora da região atendida')).toBeInTheDocument()
+    expect(screen.getByLabelText('Origem')).toHaveValue('')
+    expect(
+      screen.queryByRole('button', { name: 'Cancelar rota' }),
+    ).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'tocar no mapa' }))
+    expect(
+      screen.queryByText('Fora da região atendida'),
+    ).not.toBeInTheDocument()
+  })
+
   it('abre só com o mapa e o botão Começar', () => {
     render(<App />)
 
@@ -596,7 +618,9 @@ describe('App', () => {
           await screen.findByText('Não há rota que respeite todas as áreas'),
         ).toBeInTheDocument()
         expect(
-          screen.getByText(/Tirar esta área abre caminho/),
+          screen.getByText(
+            'O destino é alcançável sem a restrição em vermelho. Tirar esta área abre caminho:',
+          ),
         ).toBeInTheDocument()
         const lista = screen.getByRole('list', { name: 'Áreas apontadas' })
         expect(within(lista).getByText('Centro')).toBeInTheDocument()

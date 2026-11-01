@@ -26,13 +26,13 @@ function textos(causa: CausaDasAreas, quantas: number) {
     return {
       titulo,
       texto:
-        'O destino é alcançável sem restrições. Tirar esta área abre caminho:',
+        'O destino é alcançável sem a restrição em vermelho. Tirar esta área abre caminho:',
       saida: 'Para seguir, remova ou redesenhe essa área.',
     }
   return {
     titulo,
     texto:
-      'O destino é alcançável sem restrições. Tirar qualquer uma destas áreas abre caminho:',
+      'O destino é alcançável sem as restrições em vermelho. Tirar qualquer uma destas áreas abre caminho:',
     saida: 'Para seguir, remova ou redesenhe uma delas.',
   }
 }
