@@ -1,11 +1,15 @@
 """Indexador Espacial: cobertura por sobreposição, compactação, contorno e medidas (DAS 6.3)."""
 
+import math
+
 import h3.api.basic_int as h3int
 import pytest
+from pyproj import Transformer
 
 from app.dominio.indexador import (
     area_m2,
     celulas_de,
+    circulo,
     compactar,
     consolidar,
     contem,
@@ -118,3 +122,23 @@ def test_desenho_que_se_cruza_e_invalido() -> None:
 
     assert desenho_valido(DESENHO)
     assert not desenho_valido(gravata)
+
+
+# Raio (UC02, alternativo A)
+
+PARA_UTM = Transformer.from_crs("EPSG:4326", "EPSG:31982", always_xy=True)
+PRACA_SL = Coordenada(-51.1478, -29.7602)
+
+
+@pytest.mark.parametrize("metros", [100, 500, 2000])
+def test_circulo_em_metros_na_utm(metros: float) -> None:
+    """Os 64 vértices ficam a `metros` do centro, medidos em UTM 22S; a área, perto de pi r²."""
+    poligono = circulo(PRACA_SL, metros)
+    cx, cy = PARA_UTM.transform(PRACA_SL.longitude, PRACA_SL.latitude)
+
+    assert len(poligono.exterior) == 64
+    for c in poligono.exterior:
+        x, y = PARA_UTM.transform(c.longitude, c.latitude)
+        assert math.hypot(x - cx, y - cy) == pytest.approx(metros, abs=0.01)
+    assert area_m2([poligono]) == pytest.approx(math.pi * metros**2, rel=0.01)
+    assert desenho_valido(poligono)

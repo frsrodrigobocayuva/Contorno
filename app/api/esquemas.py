@@ -84,14 +84,25 @@ class RespostaDiagnostico(Modelo):
 RespostaCalculo = Annotated[RespostaRotas | RespostaDiagnostico, Field(discriminator="tipo")]
 
 
-class PedidoDeArea(Modelo):
-    """Desenho do usuário (UC02) e, se já escolhidos, a origem e o destino da consulta."""
+class RaioDTO(Modelo):
+    """Raio a partir de um ponto (UC02, alternativo A): o centro vem da busca ou de um toque."""
 
-    poligono: list[Ponto] = Field(
+    centro: Ponto
+    metros: float = Field(description="Distância do centro, em metros (100 m a 2 km, D11).")
+
+
+class PedidoDeArea(Modelo):
+    """O desenho do usuário ou o raio sobre um ponto, um dos dois (UC02), e, se já escolhidos, a
+    origem e o destino da consulta.
+    """
+
+    poligono: list[Ponto] | None = Field(
+        default=None,
         min_length=3,
         max_length=500,
         description="Vértices do desenho, em ordem, sem repetir o primeiro no fim.",
     )
+    raio: RaioDTO | None = None
     origem: Ponto | None = None
     destino: Ponto | None = None
 
@@ -106,6 +117,10 @@ class RespostaArea(Modelo):
 
     celulas: list[str] = Field(description="Células H3 compactadas, em hexadecimal (ADR-011).")
     contorno: MultiPoligonoGeoJSON
+    desenho: list[Ponto] = Field(
+        description="O que as células cobrem: o desenho ou o círculo do raio, sem repetir o "
+        "primeiro ponto no fim. A tela o mostra sob o contorno (RN04)."
+    )
     area_desenhada_m2: float
     area_proibida_m2: float
     conflitos: list[Extremo] = Field(description="Extremos que caem dentro da área (UC02, B).")
