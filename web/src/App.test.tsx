@@ -21,6 +21,7 @@ vi.mock('./mapa/Mapa', async () => {
       desenho,
       aoMudarDesenho,
       aoFecharDesenho,
+      aoRecusarDesenho,
       ref,
     }: {
       aoTocar?: (coordenadas: [number, number]) => void
@@ -32,6 +33,7 @@ vi.mock('./mapa/Mapa', async () => {
         podeDesfazer: boolean
       }) => void
       aoFecharDesenho?: (vertices: [number, number][]) => void
+      aoRecusarDesenho?: (motivo: 'FORA_DA_REGIAO' | 'DESENHO_CRUZADO') => void
       ref?: import('react').Ref<{
         desfazer: () => void
         vertices: () => [number, number][]
@@ -71,6 +73,23 @@ vi.mock('./mapa/Mapa', async () => {
               </button>
               <button type="button" onClick={() => aoFecharDesenho?.(VERTICES)}>
                 fechar desenho
+              </button>
+              <button
+                type="button"
+                onClick={() => aoRecusarDesenho?.('FORA_DA_REGIAO')}
+              >
+                tocar fora da região
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  aoMudarDesenho?.({
+                    vertices: VERTICES.slice(0, 2),
+                    podeDesfazer: true,
+                  })
+                }
+              >
+                desfazer no mapa
               </button>
             </>
           )}
@@ -664,6 +683,25 @@ describe('App', () => {
       expect(
         await screen.findByText('A origem está dentro de Área 1'),
       ).toBeInTheDocument()
+    })
+
+    it('ponto fora da região é recusado na hora, e o aviso sai com o próximo ponto', async () => {
+      await ateODesenho([[/^\/rotas\/calculo$/, () => json(ROTA)]])
+
+      fireEvent.click(
+        screen.getByRole('button', { name: 'tocar fora da região' }),
+      )
+
+      expect(screen.getByText(/Esse ponto fica fora/)).toBeInTheDocument()
+      expect(screen.getByText('Desenhar área proibida')).toBeInTheDocument()
+      expect(
+        screen.getByRole('button', { name: 'Desfazer ponto' }),
+      ).toBeEnabled()
+
+      // Um ponto a menos (desfazer) tira o aviso.
+      fireEvent.click(screen.getByRole('button', { name: 'desfazer no mapa' }))
+      expect(screen.queryByText(/Esse ponto fica fora/)).not.toBeInTheDocument()
+      expect(screen.getByText('2 pontos marcados')).toBeInTheDocument()
     })
 
     it('desenho que se cruza é recusado com aviso, sem sair do desenho', async () => {

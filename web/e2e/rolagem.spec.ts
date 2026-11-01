@@ -15,6 +15,24 @@ async function ateAsClasses(page: Page) {
   await expect(page.getByText(/mas não garante/)).toBeVisible()
 }
 
+// No meio da rolagem, o rodapé fixo encosta na borda de baixo do painel, e o ponto logo acima
+// dessa borda é do rodapé, não do conteúdo que rola por baixo (teste do usuário, 2026-11-01).
+async function rodapeEncostado(page: Page) {
+  await page.locator('.base').evaluate((base) => {
+    base.scrollTop = (base.scrollHeight - base.clientHeight) / 2
+  })
+  return page.evaluate(() => {
+    const base = document.querySelector('.base')!.getBoundingClientRect()
+    const rodape = document.querySelector('.rodape-fixo')!
+    const caixa = rodape.getBoundingClientRect()
+    const embaixo = document.elementFromPoint(base.left + 20, base.bottom - 2)
+    return {
+      folga: Math.round(base.bottom - caixa.bottom),
+      doRodape: !!embaixo && rodape.contains(embaixo),
+    }
+  })
+}
+
 async function medidas(page: Page) {
   return page.evaluate(() => {
     const base = document.querySelector('.base')!
@@ -44,6 +62,7 @@ test.describe('no celular', () => {
     await expect(
       page.getByRole('button', { name: 'Aplicar e recalcular' }),
     ).toBeInViewport()
+    expect(await rodapeEncostado(page)).toEqual({ folga: 0, doRodape: true })
 
     // Rolar o painel até o fim não mexe no mapa.
     await page.locator('.base').evaluate((base) => {
@@ -70,6 +89,10 @@ test.describe('no computador', () => {
     await expect(
       page.getByRole('button', { name: 'Aplicar e recalcular' }),
     ).toBeInViewport()
+    expect(await rodapeEncostado(page)).toEqual({ folga: 0, doRodape: true })
+    await page.locator('.base').evaluate((base) => {
+      base.scrollTop = 0
+    })
 
     // A roda do mouse sobre o painel rola o painel, não a página.
     await page.locator('.base').hover()

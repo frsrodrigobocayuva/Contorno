@@ -1,50 +1,11 @@
 // Cenário 1 da demonstração (plano, P12; critério de sucesso 1): desenhar uma área sobre a rota e
 // receber a rota restrita com o custo. O que os testes com o mapa simulado não veem, este vê: a
 // linha da rota restrita desenhada no mapa, na cor de destaque (Guia de Estilo).
-import { expect, test, type Page } from '@playwright/test'
-import { buscar } from './comum.js'
+import { expect, test } from '@playwright/test'
+import { buscar, pixels, type Cor } from './comum.js'
 
-type Cor = [number, number, number]
 // As duas rotas vão na cor de destaque: a irrestrita tracejada, a restrita em linha cheia.
 const DESTAQUE: Cor = [0x59, 0x49, 0x27]
-
-// Os pixels do mapa com a cor pedida, em coordenadas da página. A captura é lida no próprio
-// navegador, sem biblioteca de imagem.
-async function pixels(page: Page, cor: Cor) {
-  const mapa = page.getByRole('region', { name: 'Mapa' })
-  const caixa = await mapa.boundingBox()
-  if (!caixa) throw new Error('mapa sem caixa')
-  const base64 = (await mapa.screenshot()).toString('base64')
-  const achados = await page.evaluate(
-    async ({ base64, cor }) => {
-      const imagem = new Image()
-      imagem.src = `data:image/png;base64,${base64}`
-      await imagem.decode()
-      const tela = document.createElement('canvas')
-      tela.width = imagem.width
-      tela.height = imagem.height
-      const contexto = tela.getContext('2d')
-      if (!contexto) return []
-      contexto.drawImage(imagem, 0, 0)
-      const { data } = contexto.getImageData(0, 0, tela.width, tela.height)
-      const lista: { x: number; y: number }[] = []
-      for (let i = 0; i < data.length; i += 4) {
-        const perto = [0, 1, 2].every(
-          (c) => Math.abs(data[i + c] - cor[c]) <= 6,
-        )
-        if (perto) {
-          lista.push({
-            x: (i / 4) % tela.width,
-            y: Math.floor(i / 4 / tela.width),
-          })
-        }
-      }
-      return lista
-    },
-    { base64, cor },
-  )
-  return achados.map((p) => ({ x: caixa.x + p.x, y: caixa.y + p.y }))
-}
 
 test('desenhar uma área sobre a rota devolve a rota restrita com o custo', async ({
   page,

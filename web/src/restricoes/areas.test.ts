@@ -9,7 +9,7 @@ import {
   rotuloPadrao,
   type AreaDeclarada,
 } from './areas'
-import { verticesDoDesenho } from './editor'
+import { recusaDoDesenho, verticesDoDesenho } from './editor'
 
 const RESPOSTA = {
   celulas: ['8ba8b4b2c9a5fff'],
@@ -101,5 +101,40 @@ describe('vértices do desenho no Terra Draw', () => {
 
     expect(verticesDoDesenho([pronto])).toEqual(DESENHO)
     expect(verticesDoDesenho([])).toEqual([])
+  })
+})
+
+describe('o que o editor recusa na hora', () => {
+  const poligono = (anel: Coordenadas[]) => ({
+    type: 'Feature' as const,
+    geometry: { type: 'Polygon' as const, coordinates: [[...anel, anel[0]]] },
+    properties: { mode: 'polygon' },
+  })
+  const DENTRO: Coordenadas[] = [
+    [-51.15, -29.76],
+    [-51.14, -29.76],
+    [-51.14, -29.75],
+    [-51.15, -29.75],
+  ]
+  // A ponta de Sapiranga, a oeste de Novo Hamburgo: fora do retângulo de SL e NH.
+  const COM_PONTO_FORA: Coordenadas[] = [...DENTRO.slice(0, 3), [-51.25, -29.7]]
+  // Dois cantos trocados: o desenho vira uma gravata, que se cruza.
+  const GRAVATA: Coordenadas[] = [DENTRO[0], DENTRO[2], DENTRO[1], DENTRO[3]]
+
+  it('aceita o desenho dentro da região, ao marcar e ao fechar', () => {
+    expect(recusaDoDesenho(poligono(DENTRO), 'commit')).toBeNull()
+    expect(recusaDoDesenho(poligono(DENTRO), 'finish')).toBeNull()
+  })
+
+  it('recusa qualquer ponto fora da região, até o que segue o cursor', () => {
+    for (const mudanca of ['provisional', 'commit', 'finish'])
+      expect(recusaDoDesenho(poligono(COM_PONTO_FORA), mudanca)).toBe(
+        'FORA_DA_REGIAO',
+      )
+  })
+
+  it('recusa fechar um desenho que se cruza, mas não marcar o ponto', () => {
+    expect(recusaDoDesenho(poligono(GRAVATA), 'finish')).toBe('DESENHO_CRUZADO')
+    expect(recusaDoDesenho(poligono(GRAVATA), 'commit')).toBeNull()
   })
 })

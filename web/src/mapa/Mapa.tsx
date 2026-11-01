@@ -14,14 +14,15 @@ import {
 import enderecoDoWorker from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url'
 import { useEffect, useImperativeHandle, useRef, type Ref } from 'react'
 import type { Contorno, Coordenadas } from '../api/cliente'
-import { EditorDeArea, type EstadoDoDesenho } from '../restricoes/editor'
+import {
+  EditorDeArea,
+  type EstadoDoDesenho,
+  type RecusaDoDesenho,
+} from '../restricoes/editor'
+import { REGIAO } from './regiao'
 import { registrarTinta, tingido } from './tilesTingidos'
 
-// Retângulo de São Leopoldo + Novo Hamburgo (plano, D10), com folga para o mapa não cortar a borda.
-const REGIAO: [Coordenadas, Coordenadas] = [
-  [-51.2100287, -29.8302389],
-  [-50.9341246, -29.6377057],
-]
+// A região atendida, com folga para o mapa não cortar a borda.
 const FOLGA = 0.05
 const LIMITES: [Coordenadas, Coordenadas] = [
   [REGIAO[0][0] - FOLGA, REGIAO[0][1] - FOLGA],
@@ -55,6 +56,13 @@ const ESTILO: NonNullable<MapOptions['style']> = {
 
 const VAZIO = { type: 'FeatureCollection' as const, features: [] }
 
+// Área apontada pelo diagnóstico, em vermelho (teste do usuário, 2026-11-01; canvas v27): 4,7:1
+// sobre o fundo areia do mapa. As outras áreas seguem em preto.
+const TINTA: [number, number, number] = [0x1a, 0x1a, 0x1a]
+const BLOQUEIO: [number, number, number] = [0xb3, 0x26, 0x1e]
+const hex = (cor: [number, number, number]) =>
+  `#${cor.map((c) => c.toString(16).padStart(2, '0')).join('')}`
+
 export interface AreaNoMapa {
   id: string
   contorno: Contorno
@@ -81,6 +89,8 @@ interface Props {
   aoMudarDesenho?: (estado: EstadoDoDesenho) => void
   aoFecharDesenho?: (vertices: Coordenadas[]) => void
   aoTocar?: (coordenadas: Coordenadas) => void
+  // O editor recusou um ponto ou o fechamento do desenho.
+  aoRecusarDesenho?: (motivo: RecusaDoDesenho) => void
   // Duplo clique do mouse; no celular, o duplo toque continua dando zoom.
   aoCancelar?: () => void
   ref?: Ref<ControleDoMapa>
@@ -131,12 +141,13 @@ function rotuloDaArea(texto: string): HTMLElement {
   return elemento
 }
 
-// Hachura diagonal da área proibida, como no protótipo (8 × 8 px, traço a 45%).
-function hachura() {
+// Hachura diagonal da área proibida, como no protótipo (8 × 8 px): o traço preto a 45%, o
+// vermelho a 60%.
+function hachura(cor: [number, number, number], opacidade: number) {
   const lado = 8
   const data = new Uint8Array(lado * lado * 4)
   for (let i = 0; i < lado; i++) {
-    data.set([0x1a, 0x1a, 0x1a, 115], (i * lado + (lado - 1 - i)) * 4)
+    data.set([...cor, opacidade], (i * lado + (lado - 1 - i)) * 4)
   }
   return { width: lado, height: lado, data }
 }
@@ -235,7 +246,8 @@ export function Mapa({ ref, ...props }: Props) {
 
     novo.on('load', () => {
       const p = atuais.current
-      novo.addImage('hachura', hachura())
+      novo.addImage('hachura', hachura(TINTA, 115))
+      novo.addImage('hachura-vermelha', hachura(BLOQUEIO, 153))
       novo.addSource('areas', { type: 'geojson', data: contornos(p.areas) })
       novo.addSource('referencia', {
         type: 'geojson',
@@ -250,14 +262,26 @@ export function Mapa({ ref, ...props }: Props) {
         id: 'areas-hachura',
         type: 'fill',
         source: 'areas',
-        paint: { 'fill-pattern': 'hachura' },
+        paint: {
+          'fill-pattern': [
+            'case',
+            ['get', 'apontada'],
+            'hachura-vermelha',
+            'hachura',
+          ],
+        },
       })
       novo.addLayer({
         id: 'areas-contorno',
         type: 'line',
         source: 'areas',
         paint: {
-          'line-color': '#1A1A1A',
+          'line-color': [
+            'case',
+            ['get', 'apontada'],
+            hex(BLOQUEIO),
+            hex(TINTA),
+          ],
           'line-width': ['case', ['get', 'apontada'], 3.5, 1.5],
         },
       })
@@ -296,6 +320,7 @@ export function Mapa({ ref, ...props }: Props) {
         novo,
         (estado) => atuais.current.aoMudarDesenho?.(estado),
         (vertices) => atuais.current.aoFecharDesenho?.(vertices),
+        (motivo) => atuais.current.aoRecusarDesenho?.(motivo),
       )
       if (p.desenho) editor.current.iniciar(p.desenho.inicial)
     })

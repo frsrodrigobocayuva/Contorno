@@ -34,7 +34,7 @@ import {
   SEM_PREFERENCIAS,
   type Niveis,
 } from './restricoes/classes'
-import type { EstadoDoDesenho } from './restricoes/editor'
+import type { EstadoDoDesenho, RecusaDoDesenho } from './restricoes/editor'
 import { ListaDeRestricoes } from './restricoes/ListaDeRestricoes'
 import {
   PainelDaConferencia,
@@ -110,6 +110,15 @@ function avisoDoErro(erro: unknown, areas: AreaDeclarada[]): AvisoDaRota {
     texto: 'Algo deu errado do nosso lado. Tente de novo.',
     tentarDeNovo: true,
   }
+}
+
+// O editor recusa na hora o ponto fora da região e o fechamento que cruza o desenho; o desenho
+// continua aberto, e dá para desfazer (teste do usuário, 2026-11-01).
+const RECUSAS: Record<RecusaDoDesenho, string> = {
+  FORA_DA_REGIAO:
+    'Esse ponto fica fora de São Leopoldo e Novo Hamburgo. Marque os cantos dentro da região atendida.',
+  DESENHO_CRUZADO:
+    'Fechado assim, o desenho se cruza. Desfaça alguns pontos e marque de novo.',
 }
 
 function erroDoDesenho(erro: unknown): string {
@@ -257,6 +266,13 @@ function App() {
     } finally {
       if (esta === consulta.current) setCalculando(false)
     }
+  }
+
+  // Um ponto a mais ou a menos tira o aviso de um ponto recusado.
+  function mudarDesenho(estado: EstadoDoDesenho) {
+    if (estado.vertices.length !== estadoDoDesenho.vertices.length)
+      setErroDoDesenhoAtual(null)
+    setEstadoDoDesenho(estado)
   }
 
   function desenharArea(editando?: AreaDeclarada) {
@@ -464,7 +480,8 @@ function App() {
           conferencia ? [...conferencia.desenho, conferencia.desenho[0]] : null
         }
         desenho={etapa === 'desenhar' ? desenho : null}
-        aoMudarDesenho={setEstadoDoDesenho}
+        aoMudarDesenho={mudarDesenho}
+        aoRecusarDesenho={(motivo) => setErroDoDesenhoAtual(RECUSAS[motivo])}
         aoFecharDesenho={(vertices) => void conferir(vertices)}
         aoTocar={tocarNoMapa}
         aoCancelar={
