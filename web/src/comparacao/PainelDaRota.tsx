@@ -9,6 +9,7 @@ interface Props {
   restrita: Rota | null
   quantasRestricoes: number
   aoDesenharArea: () => void
+  aoRaio: () => void
   aoClassesDeVia: () => void
   aoVerRestricoes: () => void
 }
@@ -21,12 +22,13 @@ function restricoes(n: number) {
   return n === 1 ? '1 restrição aplicada' : `${n} restrições aplicadas`
 }
 
-// O raio entra na S5-04; até lá, desativado com "em breve".
 function AplicarRestricoes({
   aoDesenharArea,
+  aoRaio,
   aoClassesDeVia,
 }: {
   aoDesenharArea: () => void
+  aoRaio: () => void
   aoClassesDeVia: () => void
 }) {
   return (
@@ -40,9 +42,12 @@ function AplicarRestricoes({
         >
           Desenhar área
         </button>
-        <button type="button" className="botao botao-restricao" disabled>
+        <button
+          type="button"
+          className="botao botao-restricao"
+          onClick={aoRaio}
+        >
           Raio a partir de endereço
-          <small>em breve</small>
         </button>
         <button
           type="button"
@@ -61,6 +66,7 @@ export function PainelDaRota({
   restrita,
   quantasRestricoes,
   aoDesenharArea,
+  aoRaio,
   aoClassesDeVia,
   aoVerRestricoes,
 }: Props) {
@@ -87,6 +93,7 @@ export function PainelDaRota({
         )}
         <AplicarRestricoes
           aoDesenharArea={aoDesenharArea}
+          aoRaio={aoRaio}
           aoClassesDeVia={aoClassesDeVia}
         />
       </div>
@@ -149,6 +156,7 @@ export function PainelDaRota({
       {escolhendo && (
         <AplicarRestricoes
           aoDesenharArea={aoDesenharArea}
+          aoRaio={aoRaio}
           aoClassesDeVia={aoClassesDeVia}
         />
       )}

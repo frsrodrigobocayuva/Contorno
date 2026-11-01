@@ -72,13 +72,15 @@ export interface AreaNoMapa {
 
 // O que a tela pede ao mapa durante o desenho (telas 04 e 05).
 export interface ControleDoMapa {
-  desfazer: () => void
+  desfazerArea: () => void
   vertices: () => Coordenadas[]
 }
 
 interface Props {
   origem?: Coordenadas | null
   destino?: Coordenadas | null
+  // O centro do raio (tela 08).
+  centro?: Coordenadas | null
   rota?: Coordenadas[] | null
   rotaRestrita?: Coordenadas[] | null
   areas?: AreaNoMapa[]
@@ -94,6 +96,13 @@ interface Props {
   // Duplo clique do mouse; no celular, o duplo toque continua dando zoom.
   aoCancelar?: () => void
   ref?: Ref<ControleDoMapa>
+}
+
+function marcadorDoCentro(): HTMLElement {
+  const elemento = document.createElement('div')
+  elemento.className = 'marcador-centro'
+  elemento.setAttribute('aria-label', 'Centro do raio')
+  return elemento
 }
 
 function marcador(letra: string): HTMLElement {
@@ -180,12 +189,20 @@ function enquadrar(
 }
 
 export function Mapa({ ref, ...props }: Props) {
-  const { origem, destino, rota, rotaRestrita, areas, referencia, desenho } =
-    props
+  const {
+    origem,
+    destino,
+    centro,
+    rota,
+    rotaRestrita,
+    areas,
+    referencia,
+    desenho,
+  } = props
   const elemento = useRef<HTMLDivElement>(null)
   const mapa = useRef<MapLibreMap | null>(null)
   const editor = useRef<EditorDeArea | null>(null)
-  const marcadores = useRef<{ A?: Marker; B?: Marker }>({})
+  const marcadores = useRef<{ A?: Marker; B?: Marker; centro?: Marker }>({})
   const rotulos = useRef<Marker[]>([])
   // As últimas linhas enquadradas: uma rota que só sai de cena e volta não mexe no enquadramento.
   const enquadradas = useRef<{
@@ -202,7 +219,7 @@ export function Mapa({ ref, ...props }: Props) {
   useImperativeHandle(
     ref,
     () => ({
-      desfazer: () => editor.current?.desfazer(),
+      desfazerArea: () => editor.current?.desfazerArea(),
       vertices: () => editor.current?.vertices() ?? [],
     }),
     [],
@@ -347,6 +364,17 @@ export function Mapa({ ref, ...props }: Props) {
         : undefined
     }
   }, [origem, destino])
+
+  useEffect(() => {
+    const atual = mapa.current
+    if (!atual) return
+    marcadores.current.centro?.remove()
+    marcadores.current.centro = centro
+      ? new Marker({ element: marcadorDoCentro() })
+          .setLngLat(centro)
+          .addTo(atual)
+      : undefined
+  }, [centro])
 
   // Antes do load, as fontes ainda não existem: quem desenha é o próprio load, com as props atuais.
   // Só uma rota nova enquadra o mapa. Ao desenhar uma área, a restrita sai de cena, e o mapa fica

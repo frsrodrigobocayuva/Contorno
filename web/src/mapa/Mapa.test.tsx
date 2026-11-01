@@ -66,7 +66,7 @@ const { editores, marcadores, recusas } = vi.hoisted(() => ({
   editores: [] as {
     iniciar: ReturnType<typeof vi.fn>
     parar: ReturnType<typeof vi.fn>
-    desfazer: ReturnType<typeof vi.fn>
+    desfazerArea: ReturnType<typeof vi.fn>
     vertices: ReturnType<typeof vi.fn>
   }[],
 }))
@@ -81,7 +81,7 @@ vi.mock('../restricoes/editor', () => ({
     const editor = {
       iniciar: vi.fn(),
       parar: vi.fn(),
-      desfazer: vi.fn(),
+      desfazerArea: vi.fn(),
       vertices: vi.fn(() => [[-51.15, -29.76]]),
     }
     editores.push(editor)
@@ -398,14 +398,28 @@ describe('Mapa', () => {
     expect(editor.parar).toHaveBeenCalled()
   })
 
-  it('o controle do mapa passa o desfazer e os vértices para o editor', () => {
+  it('mostra o centro do raio e tira quando ele sai', () => {
+    const { rerender } = render(<Mapa />)
+    rerender(<Mapa centro={[-51.1478, -29.7602]} />)
+
+    const [centro] = marcadores.filter((m) => !m.removido)
+    expect(centro.opcoes.element?.getAttribute('aria-label')).toBe(
+      'Centro do raio',
+    )
+    expect(centro.lngLat).toEqual([-51.1478, -29.7602])
+
+    rerender(<Mapa centro={null} />)
+    expect(marcadores.filter((m) => !m.removido)).toHaveLength(0)
+  })
+
+  it('o controle do mapa passa o desfazer área e os vértices para o editor', () => {
     const controle = createRef<ControleDoMapa>()
     render(<Mapa ref={controle} />)
     MapaFalso.ultimo.disparar('load')
 
-    controle.current!.desfazer()
+    controle.current!.desfazerArea()
 
-    expect(editores[0].desfazer).toHaveBeenCalled()
+    expect(editores[0].desfazerArea).toHaveBeenCalled()
     expect(controle.current!.vertices()).toEqual([[-51.15, -29.76]])
   })
 })

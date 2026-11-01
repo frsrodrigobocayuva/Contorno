@@ -1,13 +1,13 @@
 // Editor de Restrições (DAS 7.2): o desenho da área com o Terra Draw sobre o MapLibre, em modo
-// polígono, com desfazer ponto (Realização, UC02). O resto do app só vê os vértices.
+// polígono (Realização, UC02). O resto do app só vê os vértices.
 //
 // O editor recusa, na hora, o ponto fora da região atendida e o fechamento de um desenho que se
-// cruza: o ponto não entra, o desenho continua aberto e dá para desfazer. Antes, a recusa vinha do
-// servidor depois de fechar, e sobrava só Cancelar (teste do usuário, 2026-11-01).
+// cruza: o ponto não entra, e o desenho continua aberto (teste do usuário, 2026-11-01). Para
+// recomeçar, "Desfazer área" apaga o desenho inteiro; o desfazer ponto saiu (S5-04, pedido do
+// usuário).
 import type { Map as MapLibreMap } from 'maplibre-gl'
 import {
   TerraDraw,
-  TerraDrawModeUndoRedo,
   TerraDrawPolygonMode,
   ValidateNotSelfIntersecting,
   type GeoJSONStoreFeatures,
@@ -18,7 +18,6 @@ import { naRegiao } from '../mapa/regiao'
 
 export interface EstadoDoDesenho {
   vertices: Coordenadas[]
-  podeDesfazer: boolean
 }
 
 export type RecusaDoDesenho = 'FORA_DA_REGIAO' | 'DESENHO_CRUZADO'
@@ -90,7 +89,6 @@ export class EditorDeArea {
           },
         }),
       ],
-      undoRedo: { modeLevel: new TerraDrawModeUndoRedo() },
     })
     this.desenho.on('change', (ids, tipo) => {
       aoMudar(this.estado())
@@ -140,35 +138,18 @@ export class EditorDeArea {
     ])
   }
 
-  private emDesenho(): boolean {
-    return this.desenho
-      .getSnapshot()
-      .some(
-        (f) => f.properties.mode === 'polygon' && f.properties.currentlyDrawing,
-      )
-  }
-
   vertices(): Coordenadas[] {
     return verticesDoDesenho(this.desenho.getSnapshot())
   }
 
-  // Com o desenho já fechado (no primeiro ponto, ou carregado para ajustar), o histórico do Terra
-  // Draw acaba; desfazer passa a tirar o último ponto do polígono, até sobrar um triângulo.
   estado(): EstadoDoDesenho {
-    const vertices = this.vertices()
-    const fechado = !this.emDesenho() && vertices.length > 3
-    return { vertices, podeDesfazer: this.desenho.canUndo() || fechado }
+    return { vertices: this.vertices() }
   }
 
-  desfazer() {
-    if (this.desenho.canUndo()) {
-      this.desenho.undo()
-      return
-    }
-    const vertices = this.vertices()
-    if (this.emDesenho() || vertices.length <= 3) return
-    this.desenho.clear()
-    this.carregar(vertices.slice(0, -1))
+  // "Desfazer área": apaga o desenho inteiro, inclusive a área carregada para ajustar, e recomeça.
+  desfazerArea() {
+    this.parar()
+    this.iniciar()
   }
 
   parar() {

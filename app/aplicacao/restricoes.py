@@ -1,6 +1,7 @@
 """Gestor de Restrições (UC02): o desenho do usuário vira a área proibida que ele vai conferir.
 
-Só áreas no MVP (plano, D1): o raio entra na S5-04 pelo mesmo caminho.
+Só áreas no MVP (plano, D1). O raio (alternativo A) chega aqui já como o polígono do círculo, e
+segue o mesmo caminho do desenho.
 """
 
 from dataclasses import dataclass

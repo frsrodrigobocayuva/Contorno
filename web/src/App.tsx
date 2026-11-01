@@ -1,7 +1,7 @@
 // O estado de uma consulta fica num ponto só, aqui, e desce para os componentes (DAS 7.2).
 // Telas do protótipo aprovado: 01/14 abertura, 02 origem e destino, 03 rota normal, 04 desenhar
-// área, 05 contorno das células, 06 rota restrita e custo, 07 restrições, 09 classes de via,
-// 10 conflito, 11 e 12 diagnóstico, 13 avisos.
+// área, 05 contorno das células, 06 rota restrita e custo, 07 restrições, 08 raio, 09 classes de
+// via, 10 conflito, 11 e 12 diagnóstico, 13 avisos, 16 confirmar cancelar.
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   calcularRota,
@@ -14,6 +14,7 @@ import {
   type Rota,
 } from './api/cliente'
 import { Aviso } from './Aviso'
+import { ConfirmarCancelar } from './ConfirmarCancelar'
 import { PainelDaRota } from './comparacao/PainelDaRota'
 import {
   PainelDoDiagnostico,
@@ -24,10 +25,12 @@ import { Mapa, type AreaNoMapa, type ControleDoMapa } from './mapa/Mapa'
 import { naRegiao } from './mapa/regiao'
 import { PONTO_NO_MAPA, type Campo, type Ponto } from './pontos'
 import {
+  circuloAproximado,
   novaArea,
   paraRestricoes,
   rotuloPadrao,
   type AreaDeclarada,
+  type RaioDaArea,
 } from './restricoes/areas'
 import {
   paraPreferencias,
@@ -42,6 +45,7 @@ import {
   PainelDoDesenho,
 } from './restricoes/PaineisDaArea'
 import { PainelDasClasses } from './restricoes/PainelDasClasses'
+import { PainelDoRaio, RAIO_INICIAL_M } from './restricoes/PainelDoRaio'
 
 type Etapa =
   | 'abertura'
@@ -50,6 +54,7 @@ type Etapa =
   | 'desenhar'
   | 'conferir'
   | 'classes'
+  | 'raio'
   | 'restricoes'
 
 interface AvisoDaRota {
@@ -69,6 +74,15 @@ interface Conferencia {
   desenho: Coordenadas[]
   resposta: RespostaArea
   editando?: string
+  // Só na área de raio: "Ajustar" volta à tela 08, e não ao desenho.
+  raio?: RaioDaArea
+}
+
+// A tela 08 em andamento: o centro (da busca ou de um toque) e a distância.
+interface RascunhoDoRaio {
+  centro: Ponto | null
+  metros: number
+  editando?: string
 }
 
 const FORA_DA_REGIAO: AvisoDaRota = {
@@ -84,7 +98,7 @@ const MOTOR_FORA_DO_AR: AvisoDaRota = {
   tentarDeNovo: true,
 }
 
-const SEM_DESENHO: EstadoDoDesenho = { vertices: [], podeDesfazer: false }
+const SEM_DESENHO: EstadoDoDesenho = { vertices: [] }
 
 function avisoDoErro(erro: unknown, areas: AreaDeclarada[]): AvisoDaRota {
   if (erro instanceof ErroDaApi && erro.codigo === 'AREA_CONTEM_EXTREMO') {
@@ -114,17 +128,26 @@ function avisoDoErro(erro: unknown, areas: AreaDeclarada[]): AvisoDaRota {
 }
 
 // O editor recusa na hora o ponto fora da região e o fechamento que cruza o desenho; o desenho
-// continua aberto, e dá para desfazer (teste do usuário, 2026-11-01).
+// continua aberto (teste do usuário, 2026-11-01).
 const RECUSAS: Record<RecusaDoDesenho, string> = {
   FORA_DA_REGIAO:
     'Esse ponto fica fora de São Leopoldo e Novo Hamburgo. Marque os cantos dentro da região atendida.',
   DESENHO_CRUZADO:
-    'Fechado assim, o desenho se cruza. Desfaça alguns pontos e marque de novo.',
+    'Fechado assim, o desenho se cruza. Mude o último ponto, ou desfaça a área e desenhe de novo.',
+}
+
+const CENTRO_FORA_DA_REGIAO =
+  'Esse ponto fica fora de São Leopoldo e Novo Hamburgo. Escolha um centro dentro da região atendida.'
+
+function erroDoRaio(erro: unknown): string {
+  if (erro instanceof ErroDaApi && erro.temMotivo('FORA_DA_REGIAO'))
+    return 'O círculo passa de São Leopoldo e Novo Hamburgo. Diminua a distância ou escolha um centro mais para dentro da região.'
+  return 'Não foi possível gerar a área agora. Tente de novo.'
 }
 
 function erroDoDesenho(erro: unknown): string {
   if (erro instanceof ErroDaApi && erro.temMotivo('POLIGONO_INVALIDO'))
-    return 'O desenho se cruza ou tem pontos repetidos. Desfaça alguns pontos e marque de novo.'
+    return 'O desenho se cruza ou tem pontos repetidos. Desfaça a área e desenhe de novo.'
   if (erro instanceof ErroDaApi && erro.temMotivo('FORA_DA_REGIAO'))
     return 'A área passa de São Leopoldo e Novo Hamburgo. Marque os cantos dentro da região atendida.'
   return 'Não foi possível conferir a área agora. Tente de novo.'
@@ -153,6 +176,8 @@ function App() {
   )
   const [conferindo, setConferindo] = useState(false)
   const [conferencia, setConferencia] = useState<Conferencia | null>(null)
+  const [raio, setRaio] = useState<RascunhoDoRaio | null>(null)
+  const [confirmandoCancelar, setConfirmandoCancelar] = useState(false)
   const [nome, setNome] = useState('')
   const [aviso, setAviso] = useState<AvisoDaRota | null>(null)
   const [diagnostico, setDiagnostico] = useState<DiagnosticoDasAreas | null>(
@@ -175,6 +200,8 @@ function App() {
     setNiveis(SEM_PREFERENCIAS)
     setDesenho(null)
     setConferencia(null)
+    setRaio(null)
+    setConfirmandoCancelar(false)
     setAviso(null)
     setDiagnostico(null)
     setCalculando(false)
@@ -182,16 +209,26 @@ function App() {
     setEtapa('pontos')
   }, [])
 
-  // Sair do desenho ou da conferência sem aplicar a área.
+  // Sair do desenho, do raio ou da conferência sem aplicar a área.
   const sairDaArea = useCallback(() => {
     setDesenho(null)
     setConferencia(null)
+    setRaio(null)
     setErroDoDesenhoAtual(null)
     setEtapa('rota')
   }, [])
 
-  // O Esc desfaz um nível por vez: no desenho e na conferência, desiste só da área; nas outras
-  // telas, cancela a rota; com tudo vazio, volta para a abertura (teste do usuário, 2026-10-31).
+  // Os atalhos (Esc e duplo clique no mapa) perguntam antes de apagar uma rota calculada; o botão
+  // "Cancelar rota" cancela direto (pedido do usuário, S5-04; tela 16).
+  const temRota = rota !== null
+  const pedirCancelar = useCallback(() => {
+    if (temRota) setConfirmandoCancelar(true)
+    else cancelar()
+  }, [temRota, cancelar])
+
+  // O Esc desfaz um nível por vez: com a janela de confirmar aberta, fecha a janela; no desenho,
+  // no raio e na conferência, desiste só da área; nas outras telas, pede para cancelar a rota;
+  // com tudo vazio, volta para a abertura (teste do usuário, 2026-10-31).
   const classesAtivas = preferenciasAtivas(niveis)
   const vazio =
     !origem && !destino && areas.length === 0 && classesAtivas.length === 0
@@ -199,14 +236,20 @@ function App() {
     if (etapa === 'abertura') return
     function aoTeclar(evento: KeyboardEvent) {
       if (evento.key !== 'Escape') return
-      if (etapa === 'desenhar' || etapa === 'conferir' || etapa === 'classes')
+      if (confirmandoCancelar) setConfirmandoCancelar(false)
+      else if (
+        etapa === 'desenhar' ||
+        etapa === 'conferir' ||
+        etapa === 'classes' ||
+        etapa === 'raio'
+      )
         sairDaArea()
       else if (etapa === 'pontos' && vazio) setEtapa('abertura')
-      else cancelar()
+      else pedirCancelar()
     }
     window.addEventListener('keydown', aoTeclar)
     return () => window.removeEventListener('keydown', aoTeclar)
-  }, [etapa, vazio, cancelar, sairDaArea])
+  }, [etapa, vazio, confirmandoCancelar, pedirCancelar, sairDaArea])
 
   function marcar(campo: Campo, ponto: Ponto) {
     if (campo === 'origem') {
@@ -225,6 +268,8 @@ function App() {
   // da região atendida, o toque não marca A nem B, como no desenho da área (2026-11-01).
   function tocarNoMapa(coordenadas: Coordenadas) {
     if (etapa === 'abertura') setEtapa('pontos')
+    else if (etapa === 'raio')
+      escolherCentro({ nome: PONTO_NO_MAPA, coordenadas })
     else if (etapa !== 'pontos') return
     else if (!naRegiao(coordenadas)) setAviso(FORA_DA_REGIAO)
     else marcar(campoAtivo, { nome: PONTO_NO_MAPA, coordenadas })
@@ -294,7 +339,7 @@ function App() {
     setErroDoDesenhoAtual(null)
     try {
       const resposta = await definirArea(
-        vertices,
+        { poligono: vertices },
         origem?.coordenadas,
         destino?.coordenadas,
       )
@@ -312,7 +357,63 @@ function App() {
     }
   }
 
+  // Raio a partir de endereço (tela 08; UC02, alternativo A).
+  function abrirRaio(editando?: AreaDeclarada) {
+    setRaio({
+      centro: editando?.raio?.centro ?? null,
+      metros: editando?.raio?.metros ?? RAIO_INICIAL_M,
+      editando: editando?.id,
+    })
+    setErroDoDesenhoAtual(null)
+    setAviso(null)
+    setEtapa('raio')
+  }
+
+  // Fora da região, o centro é recusado na hora, como A, B e os cantos do desenho.
+  function escolherCentro(centro: Ponto) {
+    if (!naRegiao(centro.coordenadas)) {
+      setErroDoDesenhoAtual(CENTRO_FORA_DA_REGIAO)
+      return
+    }
+    setErroDoDesenhoAtual(null)
+    setRaio((atual) => atual && { ...atual, centro })
+  }
+
+  async function gerarArea() {
+    if (!raio?.centro || conferindo) return
+    const forma: RaioDaArea = { centro: raio.centro, metros: raio.metros }
+    setConferindo(true)
+    setErroDoDesenhoAtual(null)
+    try {
+      const resposta = await definirArea(
+        { raio: { centro: forma.centro.coordenadas, metros: forma.metros } },
+        origem?.coordenadas,
+        destino?.coordenadas,
+      )
+      const editada = areas.find((a) => a.id === raio.editando)
+      setConferencia({
+        desenho: resposta.desenho,
+        resposta,
+        editando: editada?.id,
+        raio: forma,
+      })
+      setNome(
+        editada && !editada.rotulo.startsWith('Raio ') ? editada.rotulo : '',
+      )
+      setRaio(null)
+      setEtapa('conferir')
+    } catch (erro) {
+      setErroDoDesenhoAtual(erroDoRaio(erro))
+    } finally {
+      setConferindo(false)
+    }
+  }
+
   const outrasAreas = areas.filter((a) => a.id !== conferencia?.editando)
+  const rotuloSemNome = rotuloPadrao(
+    outrasAreas,
+    conferencia?.raio ? 'Raio' : 'Área',
+  )
 
   function confirmarArea() {
     if (!conferencia) return
@@ -320,9 +421,10 @@ function App() {
     const area = novaArea(
       id,
       nome,
-      rotuloPadrao(outrasAreas),
+      rotuloSemNome,
       conferencia.desenho,
       conferencia.resposta,
+      conferencia.raio,
     )
     const lista = conferencia.editando
       ? areas.map((a) => (a.id === id ? area : a))
@@ -337,6 +439,12 @@ function App() {
 
   function ajustarArea() {
     if (!conferencia) return
+    if (conferencia.raio) {
+      setRaio({ ...conferencia.raio, editando: conferencia.editando })
+      setConferencia(null)
+      setEtapa('raio')
+      return
+    }
     setDesenho({
       inicial: conferencia.desenho,
       editando: conferencia.editando,
@@ -366,7 +474,7 @@ function App() {
 
   // O mapa mostra as áreas da consulta; no desenho e na conferência de uma área já aplicada, a
   // versão antiga sai de cena, e a nova aparece só depois de conferida.
-  const editando = desenho?.editando ?? conferencia?.editando
+  const editando = desenho?.editando ?? raio?.editando ?? conferencia?.editando
   const apontadas = diagnostico?.candidatas ?? []
   const areasNoMapa: AreaNoMapa[] = areas
     .filter((a) => a.id !== editando)
@@ -411,14 +519,17 @@ function App() {
       )}
       {(etapa === 'desenhar' ||
         etapa === 'conferir' ||
-        etapa === 'classes') && (
+        etapa === 'classes' ||
+        etapa === 'raio') && (
         <header className="topo">
           <span className="topo-titulo">
             {etapa === 'desenhar'
               ? 'Desenhar área proibida'
               : etapa === 'conferir'
                 ? 'Confira a área proibida'
-                : 'Classes de via'}
+                : etapa === 'raio'
+                  ? 'Raio a partir de endereço'
+                  : 'Classes de via'}
           </span>
           <button type="button" className="acao-topo" onClick={sairDaArea}>
             {etapa === 'conferir' ? 'Descartar' : 'Cancelar'}
@@ -462,6 +573,21 @@ function App() {
           </p>
         </section>
       )}
+      {etapa === 'raio' && raio && (
+        <section className="campos" aria-label="Centro do raio">
+          <CampoDeEndereco
+            id="centro"
+            rotulo="Endereço do centro"
+            ponto={raio.centro}
+            ativo
+            aoAtivar={() => {}}
+            aoEscolher={escolherCentro}
+          />
+          <p className="dica">
+            Também dá para tocar no mapa para marcar o centro.
+          </p>
+        </section>
+      )}
       {etapa === 'desenhar' && (
         <p className="campos faixa-dica">
           Toque no mapa para marcar cada canto da área. Toque no primeiro ponto
@@ -472,6 +598,7 @@ function App() {
         ref={mapa}
         origem={origem?.coordenadas}
         destino={destino?.coordenadas}
+        centro={etapa === 'raio' ? raio?.centro?.coordenadas : null}
         rota={comRota ? rota?.geometria.coordinates : null}
         rotaRestrita={
           etapa === 'rota' || etapa === 'restricoes'
@@ -479,9 +606,13 @@ function App() {
             : null
         }
         areas={areasNoMapa}
-        referencia={
-          conferencia ? [...conferencia.desenho, conferencia.desenho[0]] : null
-        }
+        referencia={fechado(
+          conferencia
+            ? conferencia.desenho
+            : etapa === 'raio' && raio?.centro
+              ? circuloAproximado(raio.centro.coordenadas, raio.metros)
+              : null,
+        )}
         desenho={etapa === 'desenhar' ? desenho : null}
         aoMudarDesenho={mudarDesenho}
         aoRecusarDesenho={(motivo) => setErroDoDesenhoAtual(RECUSAS[motivo])}
@@ -489,7 +620,7 @@ function App() {
         aoTocar={tocarNoMapa}
         aoCancelar={
           etapa === 'pontos' || etapa === 'rota' || etapa === 'restricoes'
-            ? cancelar
+            ? pedirCancelar
             : undefined
         }
       />
@@ -558,6 +689,7 @@ function App() {
               restrita={restrita}
               quantasRestricoes={areas.length + classesAtivas.length}
               aoDesenharArea={() => desenharArea()}
+              aoRaio={() => abrirRaio()}
               aoClassesDeVia={abrirClasses}
               aoVerRestricoes={() => setEtapa('restricoes')}
             />
@@ -578,10 +710,9 @@ function App() {
         <section className="base">
           <PainelDoDesenho
             vertices={estadoDoDesenho.vertices}
-            podeDesfazer={estadoDoDesenho.podeDesfazer}
             conferindo={conferindo}
             erro={erroDoDesenhoAtual}
-            aoDesfazer={() => mapa.current?.desfazer()}
+            aoDesfazer={() => mapa.current?.desfazerArea()}
             aoConcluir={() => void conferir(mapa.current?.vertices() ?? [])}
           />
         </section>
@@ -591,7 +722,7 @@ function App() {
           <PainelDaConferencia
             resposta={conferencia.resposta}
             nome={nome}
-            rotuloSemNome={rotuloPadrao(outrasAreas)}
+            rotuloSemNome={rotuloSemNome}
             calculando={calculando}
             aoMudarNome={setNome}
             aoAjustar={ajustarArea}
@@ -600,6 +731,20 @@ function App() {
               setConferencia(null)
               setEtapa('pontos')
             }}
+          />
+        </section>
+      )}
+      {etapa === 'raio' && raio && (
+        <section className="base">
+          <PainelDoRaio
+            temCentro={raio.centro !== null}
+            metros={raio.metros}
+            gerando={conferindo}
+            erro={erroDoDesenhoAtual}
+            aoMudarMetros={(metros) =>
+              setRaio((atual) => atual && { ...atual, metros })
+            }
+            aoGerar={() => void gerarArea()}
           />
         </section>
       )}
@@ -623,7 +768,11 @@ function App() {
             classes={classesAtivas}
             aoAlterarClasses={abrirClasses}
             calculando={calculando}
-            aoRedesenhar={(id) => desenharArea(areas.find((a) => a.id === id))}
+            aoRedesenhar={(id) => {
+              const area = areas.find((a) => a.id === id)
+              if (area?.raio) abrirRaio(area)
+              else desenharArea(area)
+            }}
             aoRemover={removerArea}
             aoNovaRestricao={() => desenharArea()}
             aoRecalcular={() => {
@@ -633,8 +782,18 @@ function App() {
           />
         </section>
       )}
+      {confirmandoCancelar && (
+        <ConfirmarCancelar
+          aoContinuar={() => setConfirmandoCancelar(false)}
+          aoCancelar={cancelar}
+        />
+      )}
     </div>
   )
+}
+
+function fechado(anel: Coordenadas[] | null): Coordenadas[] | null {
+  return anel && anel.length ? [...anel, anel[0]] : null
 }
 
 export default App

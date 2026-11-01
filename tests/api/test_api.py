@@ -366,6 +366,78 @@ async def test_area_invalida_e_recusada(corpo: dict[str, object], campo: str, mo
     assert {"campo": campo, "motivo": motivo} in resposta.json()["detalhes"]
 
 
+# Raio (S5-04): POST /restricoes/area com o centro e a distância
+
+CENTRO_SL = [-51.1478, -29.7602]
+# Perto da borda norte do recorte (-29.6377): 2 km de raio passam dela.
+PERTO_DA_BORDA = [-51.10, -29.645]
+
+
+async def test_area_desenhada_volta_com_o_proprio_desenho() -> None:
+    async with api() as cliente:
+        resposta = await definir_area(cliente, {"poligono": A_LESTE})
+
+    assert resposta.json()["desenho"] == A_LESTE
+
+
+async def test_raio_vira_circulo_celulas_e_contorno() -> None:
+    async with api() as cliente:
+        resposta = await definir_area(
+            cliente,
+            {
+                "raio": {"centro": CENTRO_SL, "metros": 500},
+                "origem": UNISINOS,
+                "destino": CENTRO_NH,
+            },
+        )
+
+    assert resposta.status_code == 200, resposta.text
+    corpo = resposta.json()
+    assert len(corpo["desenho"]) == 64
+    assert corpo["areaDesenhadaM2"] == pytest.approx(3.1416 * 500**2, rel=0.01)
+    assert corpo["areaDesenhadaM2"] < corpo["areaProibidaM2"]
+    assert corpo["celulas"] and corpo["conflitos"] == []
+
+
+async def test_raio_em_volta_da_origem_aponta_o_conflito() -> None:
+    async with api() as cliente:
+        resposta = await definir_area(
+            cliente, {"raio": {"centro": UNISINOS, "metros": 300}, "origem": UNISINOS}
+        )
+
+    assert resposta.json()["conflitos"] == ["ORIGEM"]
+
+
+@pytest.mark.parametrize(
+    "corpo, campo, motivo",
+    [
+        ({"raio": {"centro": CENTRO_SL, "metros": 99}}, "raio.metros", "RAIO_FORA_DO_LIMITE"),
+        ({"raio": {"centro": CENTRO_SL, "metros": 2001}}, "raio.metros", "RAIO_FORA_DO_LIMITE"),
+        ({"raio": {"centro": PORTO_ALEGRE, "metros": 500}}, "raio.centro", "FORA_DA_REGIAO"),
+        ({"raio": {"centro": PERTO_DA_BORDA, "metros": 2000}}, "raio", "FORA_DA_REGIAO"),
+        ({}, "poligono", "POLIGONO_OU_RAIO"),
+        (
+            {"poligono": A_LESTE, "raio": {"centro": CENTRO_SL, "metros": 500}},
+            "poligono",
+            "POLIGONO_OU_RAIO",
+        ),
+    ],
+)
+async def test_raio_invalido_e_recusado(corpo: dict[str, object], campo: str, motivo: str) -> None:
+    async with api() as cliente:
+        resposta = await definir_area(cliente, corpo)
+
+    assert resposta.status_code == 422
+    assert {"campo": campo, "motivo": motivo} in resposta.json()["detalhes"]
+
+
+async def test_raio_perto_da_borda_cabe_com_distancia_menor() -> None:
+    async with api() as cliente:
+        resposta = await definir_area(cliente, {"raio": {"centro": PERTO_DA_BORDA, "metros": 500}})
+
+    assert resposta.status_code == 200
+
+
 async def test_area_com_menos_de_tres_vertices_fica_fora_do_esquema() -> None:
     async with api() as cliente:
         resposta = await definir_area(cliente, {"poligono": A_LESTE[:2]})

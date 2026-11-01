@@ -11,12 +11,13 @@ from typing import cast
 import h3
 import h3.api.basic_int as h3int
 from pyproj import Transformer
-from shapely import Polygon
+from shapely import Point, Polygon
 from shapely.ops import transform
 
 from app.dominio.modelo import Anel, ConjuntoDeCelulas, Coordenada, Poligono
 
 _PARA_UTM = Transformer.from_crs("EPSG:4326", "EPSG:31982", always_xy=True)
+_PARA_GRAUS = Transformer.from_crs("EPSG:31982", "EPSG:4326", always_xy=True)
 
 
 def forma_de(poligono: Poligono) -> Polygon:
@@ -31,6 +32,16 @@ def forma_de(poligono: Poligono) -> Polygon:
 def desenho_valido(poligono: Poligono) -> bool:
     """Polígono sem autointerseção (DAS 6.10)."""
     return bool(forma_de(poligono).is_valid)
+
+
+def circulo(centro: Coordenada, metros: float, lados: int = 64) -> Poligono:
+    """O círculo do raio (UC02, alt. A), construído em metros na UTM 22S e devolvido em graus
+    (Realização, UC02): um polígono regular de `lados` lados, com os vértices a `metros` do centro.
+    """
+    x, y = _PARA_UTM.transform(centro.longitude, centro.latitude)
+    forma = Point(x, y).buffer(metros, quad_segs=lados // 4)
+    anel = list(transform(_PARA_GRAUS.transform, forma).exterior.coords)[:-1]
+    return Poligono(tuple(Coordenada(lon, lat) for lon, lat in anel))
 
 
 def celulas_de(poligono: Poligono, resolucao: int) -> ConjuntoDeCelulas:

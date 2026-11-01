@@ -19,6 +19,8 @@ class Configuracao:
     cache_validade_s: float
     retangulo: tuple[float, float, float, float]
     resolucao_h3: int = 11
+    raio_minimo_m: float = 100
+    raio_maximo_m: float = 2000
     concorrencia_do_diagnostico: int = 4
 
     @classmethod
@@ -45,6 +47,9 @@ class Configuracao:
             cache_validade_s=float(ambiente.get("GEOCODER_CACHE_TTL_S", "3600")),
             retangulo=(retangulo[0], retangulo[1], retangulo[2], retangulo[3]),
             resolucao_h3=int(ambiente.get("H3_RESOLUTION", "11")),
+            # Raio de 100 m a 2 km, configurável (plano, D11).
+            raio_minimo_m=float(ambiente.get("RADIUS_MIN_M", "100")),
+            raio_maximo_m=float(ambiente.get("RADIUS_MAX_M", "2000")),
             concorrencia_do_diagnostico=int(ambiente.get("DIAGNOSIS_CONCURRENCY", "4")),
         )
 
