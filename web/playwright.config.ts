@@ -5,6 +5,9 @@ import { defineConfig, devices } from '@playwright/test'
 export default defineConfig({
   testDir: './e2e',
   timeout: 60_000,
+  // Um cenário por vez: todos usam o mesmo GraphHopper, e dois cálculos restritos juntos chegam
+  // a passar de 2 s cada um (S5-03).
+  workers: 1,
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? 'list' : 'line',
   use: {

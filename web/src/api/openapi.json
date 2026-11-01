@@ -174,8 +174,7 @@
         "enum": [
           "DESTINO_INALCANCAVEL",
           "RESTRICAO_UNICA",
-          "COMBINACAO_DE_RESTRICOES",
-          "AREAS_BLOQUEIAM"
+          "COMBINACAO_DE_RESTRICOES"
         ],
         "title": "CausaDeInviabilidade"
       },

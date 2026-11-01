@@ -56,7 +56,12 @@ class MapaFalso {
 }
 
 // O Terra Draw precisa do mapa de verdade: no lugar dele, um editor falso que registra os pedidos.
-const { editores } = vi.hoisted(() => ({
+const { editores, marcadores } = vi.hoisted(() => ({
+  marcadores: [] as {
+    opcoes: { element?: HTMLElement; anchor?: string }
+    lngLat?: [number, number]
+    removido: boolean
+  }[],
   editores: [] as {
     iniciar: ReturnType<typeof vi.fn>
     parar: ReturnType<typeof vi.fn>
@@ -82,13 +87,21 @@ vi.mock('maplibre-gl', () => ({
     return new MapaFalso(opcoes)
   },
   Marker: class {
-    setLngLat() {
+    registro: (typeof marcadores)[number]
+    constructor(opcoes: (typeof marcadores)[number]['opcoes']) {
+      this.registro = { opcoes, removido: false }
+      marcadores.push(this.registro)
+    }
+    setLngLat(lngLat: [number, number]) {
+      this.registro.lngLat = lngLat
       return this
     }
     addTo() {
       return this
     }
-    remove() {}
+    remove() {
+      this.registro.removido = true
+    }
   },
   NavigationControl: class {},
   addProtocol: vi.fn(),
@@ -117,6 +130,7 @@ function apontar(elemento: Element, tipo: string) {
 beforeEach(() => {
   vi.clearAllMocks()
   editores.length = 0
+  marcadores.length = 0
 })
 
 describe('Mapa', () => {
@@ -160,6 +174,25 @@ describe('Mapa', () => {
       type: 'FeatureCollection',
       features: [],
     })
+  })
+
+  it('só uma rota nova enquadra o mapa; a que sai de cena e volta, não', () => {
+    const restrita: Coordenadas[] = [
+      [-51.16, -29.79],
+      [-51.14, -29.69],
+    ]
+    const { rerender } = render(<Mapa rota={ROTA} rotaRestrita={restrita} />)
+    const mapa = MapaFalso.ultimo
+    carregarEDepoisBuscarTiles(mapa)
+    mapa.fitBounds.mockClear()
+
+    // No desenho, a restrita sai do mapa; depois, volta a mesma.
+    rerender(<Mapa rota={ROTA} rotaRestrita={null} />)
+    rerender(<Mapa rota={ROTA} rotaRestrita={restrita} />)
+    expect(mapa.fitBounds).not.toHaveBeenCalled()
+
+    rerender(<Mapa rota={ROTA} rotaRestrita={[...restrita]} />)
+    expect(mapa.fitBounds).toHaveBeenCalledOnce()
   })
 
   it('fica em 2D, com o norte para cima, sem girar nem inclinar', () => {
@@ -252,13 +285,66 @@ describe('Mapa', () => {
     expect(mapa.fontes.areas.setData).toHaveBeenLastCalledWith({
       type: 'FeatureCollection',
       features: [
-        { type: 'Feature', properties: { id: 'a1' }, geometry: contorno },
+        {
+          type: 'Feature',
+          properties: { id: 'a1', apontada: false },
+          geometry: contorno,
+        },
       ],
     })
     expect(mapa.addImage).toHaveBeenCalledWith(
       'hachura',
       expect.objectContaining({ width: 8, height: 8 }),
     )
+  })
+
+  it('a área apontada pelo diagnóstico ganha o nome e um contorno mais forte', () => {
+    const contorno = {
+      type: 'MultiPolygon' as const,
+      coordinates: [
+        [
+          [
+            [-51.15, -29.76],
+            [-51.14, -29.76],
+            [-51.145, -29.74],
+            [-51.15, -29.76],
+          ] as [number, number][],
+        ],
+      ],
+    }
+    const { rerender } = render(<Mapa />)
+    const mapa = MapaFalso.ultimo
+    carregarEDepoisBuscarTiles(mapa)
+
+    rerender(
+      <Mapa
+        areas={[
+          { id: 'a1', contorno, rotuloApontado: 'Centro' },
+          { id: 'a2', contorno },
+        ]}
+      />,
+    )
+
+    const nomes = marcadores.filter((m) => !m.removido)
+    expect(nomes).toHaveLength(1)
+    expect(nomes[0].opcoes.element?.textContent).toBe('Centro')
+    expect(nomes[0].opcoes.anchor).toBe('bottom')
+    expect(nomes[0].lngLat).toEqual([-51.145, -29.74])
+    expect(
+      mapa.fontes.areas.setData.mock.lastCall?.[0].features.map(
+        (f: { properties: object }) => f.properties,
+      ),
+    ).toEqual([
+      { id: 'a1', apontada: true },
+      { id: 'a2', apontada: false },
+    ])
+    const contornoDasAreas = mapa.camadas.find((c) => c.id === 'areas-contorno')
+    expect(contornoDasAreas).toMatchObject({
+      paint: { 'line-width': ['case', ['get', 'apontada'], 3.5, 1.5] },
+    })
+
+    rerender(<Mapa areas={[{ id: 'a1', contorno }]} />)
+    expect(marcadores.filter((m) => !m.removido)).toHaveLength(0)
   })
 
   it('liga o editor com o desenho e desliga sem ele', () => {

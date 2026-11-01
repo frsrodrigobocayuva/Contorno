@@ -19,6 +19,7 @@ class Configuracao:
     cache_validade_s: float
     retangulo: tuple[float, float, float, float]
     resolucao_h3: int = 11
+    concorrencia_do_diagnostico: int = 4
 
     @classmethod
     def do_ambiente(cls, ambiente: Mapping[str, str] = os.environ) -> "Configuracao":
@@ -36,7 +37,7 @@ class Configuracao:
             raise RuntimeError("AREA_BBOX precisa de 4 números: min_lon,min_lat,max_lon,max_lat")
         return cls(
             graphhopper_url=exigir("GRAPHHOPPER_URL"),
-            tempo_maximo_motor_s=float(ambiente.get("ENGINE_TIMEOUT_S", "2")),
+            tempo_maximo_motor_s=float(ambiente.get("ENGINE_TIMEOUT_S", "5")),
             nominatim_url=ambiente.get("NOMINATIM_URL", "https://nominatim.openstreetmap.org"),
             nominatim_user_agent=user_agent,
             tempo_maximo_geocodificador_s=float(ambiente.get("GEOCODER_TIMEOUT_S", "10")),
@@ -44,6 +45,7 @@ class Configuracao:
             cache_validade_s=float(ambiente.get("GEOCODER_CACHE_TTL_S", "3600")),
             retangulo=(retangulo[0], retangulo[1], retangulo[2], retangulo[3]),
             resolucao_h3=int(ambiente.get("H3_RESOLUTION", "11")),
+            concorrencia_do_diagnostico=int(ambiente.get("DIAGNOSIS_CONCURRENCY", "4")),
         )
 
     def no_recorte(self, longitude: float, latitude: float) -> bool:

@@ -4,7 +4,7 @@ Planejador de rotas web em que o usuário declara por onde **não** quer passar,
 
 Recorte do MVP: São Leopoldo e Novo Hamburgo (RS), sobre dados abertos do OpenStreetMap.
 
-> **Estado:** Sprint 5 em andamento. Já dá para marcar origem e destino (buscando o endereço ou tocando no mapa), ver a rota normal, desenhar áreas proibidas, escolher quanto evitar cada classe de via e ver a rota que obedece, com o custo da escolha. O raio a partir de um endereço e o diagnóstico que aponta a área que bloqueia chegam ainda na Sprint 5.
+> **Estado:** Sprint 5 em andamento. Já dá para marcar origem e destino (buscando o endereço ou tocando no mapa), ver a rota normal, desenhar áreas proibidas, escolher quanto evitar cada classe de via e ver a rota que obedece, com o custo da escolha. Quando nenhum caminho respeita as áreas, o Contorno aponta quais delas bloqueiam o trajeto. O raio a partir de um endereço chega ainda na Sprint 5.
 
 ## Pilha
 

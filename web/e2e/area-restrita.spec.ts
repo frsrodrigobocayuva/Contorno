@@ -2,6 +2,7 @@
 // receber a rota restrita com o custo. O que os testes com o mapa simulado não veem, este vê: a
 // linha da rota restrita desenhada no mapa, na cor de destaque (Guia de Estilo).
 import { expect, test, type Page } from '@playwright/test'
+import { buscar } from './comum.js'
 
 type Cor = [number, number, number]
 // As duas rotas vão na cor de destaque: a irrestrita tracejada, a restrita em linha cheia.
@@ -43,19 +44,6 @@ async function pixels(page: Page, cor: Cor) {
     { base64, cor },
   )
   return achados.map((p) => ({ x: caixa.x + p.x, y: caixa.y + p.y }))
-}
-
-// As buscas gravadas nos falsos do Nominatim: no CI, a API fala com eles.
-async function buscar(page: Page, campo: 'Origem' | 'Destino', texto: string) {
-  const entrada = page.getByRole('textbox', { name: campo, exact: true })
-  const formulario = page.locator('form', { has: entrada })
-  await entrada.fill(texto)
-  await formulario.getByRole('button', { name: 'Buscar' }).click()
-  await page
-    .getByRole('list', { name: `Resultados para ${campo.toLowerCase()}` })
-    .getByRole('button')
-    .first()
-    .click()
 }
 
 test('desenhar uma área sobre a rota devolve a rota restrita com o custo', async ({

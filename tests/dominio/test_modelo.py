@@ -260,7 +260,6 @@ def test_resultado_restrita_se_e_so_se_houver_restricoes() -> None:
         (CausaDeInviabilidade.RESTRICAO_UNICA, ("a1",)),
         (CausaDeInviabilidade.RESTRICAO_UNICA, ("a1", "a2")),
         (CausaDeInviabilidade.COMBINACAO_DE_RESTRICOES, ("a1", "a2")),
-        (CausaDeInviabilidade.AREAS_BLOQUEIAM, ()),
     ],
 )
 def test_diagnostico_valido(causa: CausaDeInviabilidade, candidatas: tuple[str, ...]) -> None:
@@ -274,7 +273,6 @@ def test_diagnostico_valido(causa: CausaDeInviabilidade, candidatas: tuple[str, 
         (CausaDeInviabilidade.RESTRICAO_UNICA, ()),
         (CausaDeInviabilidade.COMBINACAO_DE_RESTRICOES, ("a1",)),
         (CausaDeInviabilidade.RESTRICAO_UNICA, ("a1", "a1")),
-        (CausaDeInviabilidade.AREAS_BLOQUEIAM, ("a1",)),
     ],
 )
 def test_diagnostico_invalido(causa: CausaDeInviabilidade, candidatas: tuple[str, ...]) -> None:
@@ -332,7 +330,6 @@ def test_regra_de_custo_invalida(chave: str, valores: frozenset[str], fator: flo
         (CausaDeInviabilidade.DESTINO_INALCANCAVEL, ()),
         (CausaDeInviabilidade.RESTRICAO_UNICA, ("a1",)),
         (CausaDeInviabilidade.COMBINACAO_DE_RESTRICOES, ("a1", "a2")),
-        (CausaDeInviabilidade.AREAS_BLOQUEIAM, ()),
     ],
 )
 def test_diagnostico_tem_mensagem_para_cada_causa(

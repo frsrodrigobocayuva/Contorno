@@ -1,6 +1,7 @@
 // O estado de uma consulta fica num ponto só, aqui, e desce para os componentes (DAS 7.2).
 // Telas do protótipo aprovado: 01/14 abertura, 02 origem e destino, 03 rota normal, 04 desenhar
-// área, 05 contorno das células, 06 rota restrita e custo, 07 restrições, 10 conflito, 13 avisos.
+// área, 05 contorno das células, 06 rota restrita e custo, 07 restrições, 09 classes de via,
+// 10 conflito, 11 e 12 diagnóstico, 13 avisos.
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   calcularRota,
@@ -14,6 +15,10 @@ import {
 } from './api/cliente'
 import { Aviso } from './Aviso'
 import { PainelDaRota } from './comparacao/PainelDaRota'
+import {
+  PainelDoDiagnostico,
+  type CausaDasAreas,
+} from './comparacao/PainelDoDiagnostico'
 import { CampoDeEndereco } from './mapa/CampoDeEndereco'
 import { Mapa, type AreaNoMapa, type ControleDoMapa } from './mapa/Mapa'
 import { PONTO_NO_MAPA, type Campo, type Ponto } from './pontos'
@@ -51,6 +56,12 @@ interface AvisoDaRota {
   texto: string
   tentarDeNovo?: boolean
   verRestricoes?: boolean
+}
+
+// As áreas que o diagnóstico apontou valem até o próximo cálculo (S5-03).
+interface DiagnosticoDasAreas {
+  causa: CausaDasAreas
+  candidatas: string[]
 }
 
 interface Conferencia {
@@ -134,6 +145,9 @@ function App() {
   const [conferencia, setConferencia] = useState<Conferencia | null>(null)
   const [nome, setNome] = useState('')
   const [aviso, setAviso] = useState<AvisoDaRota | null>(null)
+  const [diagnostico, setDiagnostico] = useState<DiagnosticoDasAreas | null>(
+    null,
+  )
   const [calculando, setCalculando] = useState(false)
   const mapa = useRef<ControleDoMapa>(null)
   // Cada cancelamento muda a consulta; a resposta de um cálculo de antes dele é descartada.
@@ -152,6 +166,7 @@ function App() {
     setDesenho(null)
     setConferencia(null)
     setAviso(null)
+    setDiagnostico(null)
     setCalculando(false)
     setCampoAtivo('origem')
     setEtapa('pontos')
@@ -193,6 +208,7 @@ function App() {
     setRota(null)
     setRestrita(null)
     setAviso(null)
+    setDiagnostico(null)
   }
 
   // Na abertura, um toque no mapa (sem arrastar) faz o mesmo que Começar, sem marcar ponto.
@@ -210,6 +226,7 @@ function App() {
     const esta = consulta.current
     setCalculando(true)
     setAviso(null)
+    setDiagnostico(null)
     try {
       const resposta = await calcularRota(
         origem.coordenadas,
@@ -221,20 +238,19 @@ function App() {
         setRota(resposta.irrestrita)
         setRestrita(resposta.restrita ?? null)
         setEtapa('rota')
-      } else if (resposta.causa === 'AREAS_BLOQUEIAM') {
-        // Aviso provisório até o diagnóstico do S5-03 (plano, 2026-10-30).
-        setRestrita(null)
-        setAviso({
-          titulo: 'Nenhum caminho respeita as áreas',
-          texto: resposta.mensagem,
-          verRestricoes: true,
-        })
-        setEtapa('rota')
-      } else {
+      } else if (resposta.causa === 'DESTINO_INALCANCAVEL') {
         setAviso({
           titulo: 'Não existe caminho até este destino',
           texto: resposta.mensagem,
         })
+      } else {
+        // UC05: as áreas bloqueiam, e o diagnóstico diz quais (telas 11 e 12).
+        setRestrita(null)
+        setDiagnostico({
+          causa: resposta.causa,
+          candidatas: resposta.candidatas,
+        })
+        setEtapa('rota')
       }
     } catch (erro) {
       if (esta === consulta.current) setAviso(avisoDoErro(erro, comAreas))
@@ -332,9 +348,14 @@ function App() {
   // O mapa mostra as áreas da consulta; no desenho e na conferência de uma área já aplicada, a
   // versão antiga sai de cena, e a nova aparece só depois de conferida.
   const editando = desenho?.editando ?? conferencia?.editando
+  const apontadas = diagnostico?.candidatas ?? []
   const areasNoMapa: AreaNoMapa[] = areas
     .filter((a) => a.id !== editando)
-    .map(({ id, contorno }) => ({ id, contorno }))
+    .map(({ id, contorno, rotulo }) => ({
+      id,
+      contorno,
+      rotuloApontado: apontadas.includes(id) ? rotulo : undefined,
+    }))
   if (conferencia && !conferencia.resposta.conflitos.length) {
     areasNoMapa.push({
       id: 'em-conferencia',
@@ -498,7 +519,20 @@ function App() {
               {calculando ? 'Calculando…' : 'Calcular rota'}
             </button>
           )}
-          {etapa === 'rota' && rota && (
+          {etapa === 'rota' && diagnostico && (
+            <PainelDoDiagnostico
+              causa={diagnostico.causa}
+              areas={diagnostico.candidatas.flatMap((id) =>
+                areas.filter((a) => a.id === id),
+              )}
+              aoMudarDestino={() => {
+                setCampoAtivo('destino')
+                setEtapa('pontos')
+              }}
+              aoEditarRestricoes={() => setEtapa('restricoes')}
+            />
+          )}
+          {etapa === 'rota' && rota && !diagnostico && (
             <PainelDaRota
               rota={rota}
               restrita={restrita}
@@ -565,6 +599,7 @@ function App() {
         <section className="base">
           <ListaDeRestricoes
             areas={areas}
+            apontadas={apontadas}
             classes={classesAtivas}
             aoAlterarClasses={abrirClasses}
             calculando={calculando}

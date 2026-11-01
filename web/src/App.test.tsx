@@ -17,6 +17,7 @@ vi.mock('./mapa/Mapa', async () => {
     Mapa: ({
       aoTocar,
       aoCancelar,
+      areas,
       desenho,
       aoMudarDesenho,
       aoFecharDesenho,
@@ -24,6 +25,7 @@ vi.mock('./mapa/Mapa', async () => {
     }: {
       aoTocar?: (coordenadas: [number, number]) => void
       aoCancelar?: () => void
+      areas?: { id: string; rotuloApontado?: string }[]
       desenho?: object | null
       aoMudarDesenho?: (estado: {
         vertices: [number, number][]
@@ -50,6 +52,13 @@ vi.mock('./mapa/Mapa', async () => {
               duplo clique no mapa
             </button>
           )}
+          <ul aria-label="nomes no mapa">
+            {areas
+              ?.filter((a) => a.rotuloApontado)
+              .map((a) => (
+                <li key={a.id}>{a.rotuloApontado}</li>
+              ))}
+          </ul>
           {desenho && (
             <>
               <button
@@ -523,38 +532,108 @@ describe('App', () => {
       expect(screen.getByText('Desenhar área proibida')).toBeInTheDocument()
     })
 
-    it('quando as áreas bloqueiam, avisa e leva às restrições para remover', async () => {
-      const fetch = await ateODesenho([
-        [/^\/restricoes\/area$/, () => json(AREA)],
-        [
-          /^\/rotas\/calculo$/,
-          (opcoes) =>
-            corpo(opcoes).restricoes?.length
-              ? json({
-                  tipo: 'DIAGNOSTICO',
-                  causa: 'AREAS_BLOQUEIAM',
-                  candidatas: [],
-                  mensagem: 'Não existe caminho que respeite as áreas.',
-                })
-              : json(ROTA),
-        ],
-      ])
-      fireEvent.click(screen.getByRole('button', { name: 'Concluir área' }))
-      fireEvent.click(
-        await screen.findByRole('button', { name: 'Confirmar e recalcular' }),
-      )
+    describe('diagnóstico (S5-03)', () => {
+      // Confirma uma área e responde ao cálculo com ela usando `diagnostico`.
+      async function ateODiagnostico(
+        diagnostico: (ids: string[]) => {
+          causa: string
+          candidatas: string[]
+        },
+      ) {
+        const fetch = await ateODesenho([
+          [/^\/restricoes\/area$/, () => json(AREA)],
+          [
+            /^\/rotas\/calculo$/,
+            (opcoes) => {
+              const ids = (corpo(opcoes).restricoes ?? []).map((r) => r.id)
+              return ids.length
+                ? json({
+                    tipo: 'DIAGNOSTICO',
+                    mensagem: 'x',
+                    ...diagnostico(ids),
+                  })
+                : json(ROTA)
+            },
+          ],
+        ])
+        fireEvent.click(screen.getByRole('button', { name: 'Concluir área' }))
+        fireEvent.change(
+          await screen.findByLabelText('Nome da área (opcional)'),
+          { target: { value: 'Centro' } },
+        )
+        fireEvent.click(
+          screen.getByRole('button', { name: 'Confirmar e recalcular' }),
+        )
+        return fetch
+      }
 
-      expect(
-        await screen.findByText('Nenhum caminho respeita as áreas'),
-      ).toBeInTheDocument()
-      fireEvent.click(screen.getByRole('button', { name: 'Ver restrições' }))
-      expect(screen.getByText('Áreas proibidas (1)')).toBeInTheDocument()
+      it('aponta a área no painel, no mapa e na lista, até o próximo cálculo', async () => {
+        const fetch = await ateODiagnostico((ids) => ({
+          causa: 'RESTRICAO_UNICA',
+          candidatas: ids,
+        }))
 
-      fireEvent.click(screen.getByRole('button', { name: 'Remover Área 1' }))
-      fireEvent.click(screen.getByRole('button', { name: 'Recalcular rota' }))
+        expect(
+          await screen.findByText('Não há rota que respeite todas as áreas'),
+        ).toBeInTheDocument()
+        expect(
+          screen.getByText(/Tirar esta área abre caminho/),
+        ).toBeInTheDocument()
+        const lista = screen.getByRole('list', { name: 'Áreas apontadas' })
+        expect(within(lista).getByText('Centro')).toBeInTheDocument()
+        expect(screen.queryByText('Custo da restrição')).not.toBeInTheDocument()
+        expect(
+          within(screen.getByRole('list', { name: 'nomes no mapa' })).getByText(
+            'Centro',
+          ),
+        ).toBeInTheDocument()
 
-      expect(await screen.findByText('nenhuma restrição')).toBeInTheDocument()
-      expect(corpo(fetch.mock.calls.at(-1)![1]).restricoes).toEqual([])
+        fireEvent.click(
+          screen.getByRole('button', { name: 'Editar restrições' }),
+        )
+        expect(screen.getByText('bloqueia o trajeto')).toBeInTheDocument()
+
+        fireEvent.click(screen.getByRole('button', { name: 'Remover Centro' }))
+        fireEvent.click(screen.getByRole('button', { name: 'Recalcular rota' }))
+
+        expect(await screen.findByText('nenhuma restrição')).toBeInTheDocument()
+        expect(corpo(fetch.mock.calls.at(-1)![1]).restricoes).toEqual([])
+        expect(
+          within(
+            screen.getByRole('list', { name: 'nomes no mapa' }),
+          ).queryAllByRole('listitem'),
+        ).toHaveLength(0)
+      })
+
+      it('na combinação, diz que tirar uma só não abre caminho', async () => {
+        await ateODiagnostico((ids) => ({
+          causa: 'COMBINACAO_DE_RESTRICOES',
+          candidatas: [...ids, 'outra'],
+        }))
+
+        expect(
+          await screen.findByText(/Tirar uma área só não abre caminho/),
+        ).toBeInTheDocument()
+        expect(
+          screen.getByText('Para seguir, remova ou redesenhe mais de uma.'),
+        ).toBeInTheDocument()
+      })
+
+      it('mudar o destino volta à origem e ao destino, no campo do destino', async () => {
+        await ateODiagnostico((ids) => ({
+          causa: 'RESTRICAO_UNICA',
+          candidatas: ids,
+        }))
+
+        fireEvent.click(
+          await screen.findByRole('button', { name: 'Mudar o destino' }),
+        )
+
+        expect(screen.getByLabelText('Destino')).toBeInTheDocument()
+        expect(
+          screen.getByRole('button', { name: 'Calcular rota' }),
+        ).toBeEnabled()
+      })
     })
 
     it('com a origem dentro de uma área, o cálculo avisa qual área', async () => {

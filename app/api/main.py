@@ -15,6 +15,7 @@ from app.api.config import Configuracao
 from app.api.dependencias import Dependencias, Deps
 from app.api.erros import registrar_tratadores
 from app.api.registro import configurar_log, registrar_requisicoes
+from app.aplicacao.diagnosticador import DiagnosticadorDeInviabilidade
 from app.aplicacao.enderecos import LocalizadorDeEndereco
 from app.aplicacao.orquestrador import OrquestradorDeRota
 from app.aplicacao.restricoes import GestorDeRestricoes
@@ -37,7 +38,9 @@ def montar(config: Configuracao, cliente: httpx.AsyncClient) -> Dependencias:
     return Dependencias(
         config,
         cliente,
-        OrquestradorDeRota(motor),
+        OrquestradorDeRota(
+            motor, DiagnosticadorDeInviabilidade(motor, config.concorrencia_do_diagnostico)
+        ),
         LocalizadorDeEndereco(geocodificador),
         GestorDeRestricoes(config.resolucao_h3),
     )

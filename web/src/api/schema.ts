@@ -95,7 +95,7 @@ export interface components {
          * CausaDeInviabilidade
          * @enum {string}
          */
-        CausaDeInviabilidade: "DESTINO_INALCANCAVEL" | "RESTRICAO_UNICA" | "COMBINACAO_DE_RESTRICOES" | "AREAS_BLOQUEIAM";
+        CausaDeInviabilidade: "DESTINO_INALCANCAVEL" | "RESTRICAO_UNICA" | "COMBINACAO_DE_RESTRICOES";
         /**
          * ClasseDeVia
          * @enum {string}
