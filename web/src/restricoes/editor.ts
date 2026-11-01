@@ -92,7 +92,26 @@ export class EditorDeArea {
       ],
       undoRedo: { modeLevel: new TerraDrawModeUndoRedo() },
     })
-    this.desenho.on('change', () => aoMudar(this.estado()))
+    this.desenho.on('change', (ids, tipo) => {
+      aoMudar(this.estado())
+      // O primeiro ponto cria o desenho sem passar pela validação. Fora da região, ele ficava no
+      // desenho, e todo ponto seguinte era recusado junto com ele (teste do usuário, 2026-11-01).
+      // O descarte espera o toque terminar: no meio dele, o modo ainda guarda o desenho criado.
+      if (tipo !== 'create') return
+      queueMicrotask(() => {
+        const criado = this.desenho
+          .getSnapshot()
+          .find(
+            (f) =>
+              ids.includes(f.id as string) &&
+              f.properties.currentlyDrawing &&
+              recusaDoDesenho(f, 'commit') === 'FORA_DA_REGIAO',
+          )
+        if (!criado?.id) return
+        this.desenho.removeFeatures([criado.id])
+        aoRecusar('FORA_DA_REGIAO')
+      })
+    })
     // Tocar no primeiro ponto fecha a área; arrastar um vértice (Ajustar) não fecha.
     this.desenho.on('finish', (_id, contexto) => {
       if (contexto.action !== 'draw') return
