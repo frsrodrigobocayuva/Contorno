@@ -8,6 +8,8 @@
   --fundo: #ffffff;
   --fundo-suave: #f4f4f4;
   --mapa: #edd8af;
+  /* Área apontada pelo diagnóstico, no mapa (canvas v27). */
+  --bloqueio: #b3261e;
   font-family:
     'Atkinson Hyperlegible', system-ui, 'Segoe UI', Roboto, sans-serif;
   font-size: 15px;
@@ -47,14 +49,20 @@ input {
   overscroll-behavior: contain;
 }
 
-/* A ação principal fica à vista no rodapé do painel enquanto o resto rola (telas 07 e 09). */
+/* A ação principal fica à vista no rodapé do painel enquanto o resto rola (telas 07 e 09). O
+   rodapé encosta na borda de baixo: o -16px desconta o respiro do painel, que o sticky respeita,
+   e por onde o conteúdo vazava (teste do usuário, 2026-11-01). */
 .rodape-fixo {
   position: sticky;
-  bottom: 0;
+  bottom: -16px;
   margin: 0 -16px;
-  padding: 12px 16px;
+  padding: 12px 16px 16px;
   background: var(--fundo);
   border-top: 1px solid var(--borda);
+}
+
+.base > .rodape-fixo:last-child {
+  margin-bottom: -16px;
 }
 
 /* Abertura: só o mapa, o nome e o botão (telas 01 e 14). */
@@ -492,7 +500,7 @@ input {
 .rotulo-da-area {
   padding: 3px 6px;
   border-radius: 3px;
-  background: var(--tinta);
+  background: var(--bloqueio);
   color: #ffffff;
   font-size: 12px;
   font-weight: 600;

@@ -56,7 +56,8 @@ class MapaFalso {
 }
 
 // O Terra Draw precisa do mapa de verdade: no lugar dele, um editor falso que registra os pedidos.
-const { editores, marcadores } = vi.hoisted(() => ({
+const { editores, marcadores, recusas } = vi.hoisted(() => ({
+  recusas: [] as ((motivo: string) => void)[],
   marcadores: [] as {
     opcoes: { element?: HTMLElement; anchor?: string }
     lngLat?: [number, number]
@@ -70,7 +71,13 @@ const { editores, marcadores } = vi.hoisted(() => ({
   }[],
 }))
 vi.mock('../restricoes/editor', () => ({
-  EditorDeArea: function () {
+  EditorDeArea: function (
+    _mapa: unknown,
+    _aoMudar: unknown,
+    _aoFechar: unknown,
+    aoRecusar: (motivo: string) => void,
+  ) {
+    recusas.push(aoRecusar)
     const editor = {
       iniciar: vi.fn(),
       parar: vi.fn(),
@@ -131,6 +138,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   editores.length = 0
   marcadores.length = 0
+  recusas.length = 0
 })
 
 describe('Mapa', () => {
@@ -338,13 +346,40 @@ describe('Mapa', () => {
       { id: 'a1', apontada: true },
       { id: 'a2', apontada: false },
     ])
-    const contornoDasAreas = mapa.camadas.find((c) => c.id === 'areas-contorno')
-    expect(contornoDasAreas).toMatchObject({
-      paint: { 'line-width': ['case', ['get', 'apontada'], 3.5, 1.5] },
+    const camada = (id: string) => mapa.camadas.find((c) => c.id === id)
+    expect(camada('areas-contorno')).toMatchObject({
+      paint: {
+        'line-color': ['case', ['get', 'apontada'], '#b3261e', '#1a1a1a'],
+        'line-width': ['case', ['get', 'apontada'], 3.5, 1.5],
+      },
     })
+    expect(camada('areas-hachura')).toMatchObject({
+      paint: {
+        'fill-pattern': [
+          'case',
+          ['get', 'apontada'],
+          'hachura-vermelha',
+          'hachura',
+        ],
+      },
+    })
+    expect(mapa.addImage).toHaveBeenCalledWith(
+      'hachura-vermelha',
+      expect.objectContaining({ width: 8, height: 8 }),
+    )
 
     rerender(<Mapa areas={[{ id: 'a1', contorno }]} />)
     expect(marcadores.filter((m) => !m.removido)).toHaveLength(0)
+  })
+
+  it('repassa a recusa do editor para quem desenha', () => {
+    const aoRecusarDesenho = vi.fn()
+    render(<Mapa aoRecusarDesenho={aoRecusarDesenho} />)
+    MapaFalso.ultimo.disparar('load')
+
+    recusas[0]('FORA_DA_REGIAO')
+
+    expect(aoRecusarDesenho).toHaveBeenCalledWith('FORA_DA_REGIAO')
   })
 
   it('liga o editor com o desenho e desliga sem ele', () => {

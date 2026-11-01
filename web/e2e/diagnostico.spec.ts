@@ -5,7 +5,10 @@
 // aberta para leste e outra para oeste. Sozinha, cada uma deixa passar; juntas, fecham um anel em
 // volta do destino. Tirar qualquer uma abre caminho, então as duas são apontadas.
 import { expect, test, type Page } from '@playwright/test'
-import { buscar } from './comum.js'
+import { buscar, pixels, type Cor } from './comum.js'
+
+// Área apontada pelo diagnóstico (canvas v27).
+const BLOQUEIO: Cor = [0xb3, 0x26, 0x1e]
 
 // Raios do C em pixels. O primeiro e o último ponto, e cada par de pontos seguidos, ficam a mais de
 // 40 px um do outro, a distância em que o editor fecha o desenho sozinho.
@@ -106,8 +109,17 @@ test('isolar o destino com áreas aponta as áreas que bloqueiam', async ({
   ).toBeVisible()
   const apontadas = page.getByRole('list', { name: 'Áreas apontadas' })
   await expect(apontadas.getByRole('listitem')).toHaveText([/Oeste/, /Leste/])
-  // No mapa, o nome das duas.
+  // No mapa, o nome das duas, e as duas em vermelho.
   await expect(page.locator('.rotulo-da-area')).toHaveText(['Oeste', 'Leste'])
+  await expect(page.locator('.rotulo-da-area').first()).toHaveCSS(
+    'background-color',
+    'rgb(179, 38, 30)',
+  )
+  await expect
+    .poll(async () => (await pixels(page, BLOQUEIO)).length, {
+      timeout: 20_000,
+    })
+    .toBeGreaterThan(500)
 
   // Na lista de restrições, as duas levam a etiqueta.
   await page.getByRole('button', { name: 'Editar restrições' }).click()
