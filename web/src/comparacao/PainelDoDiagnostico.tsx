@@ -60,7 +60,7 @@ export function PainelDoDiagnostico({
         ))}
       </ul>
       <p className="dica">{saida}</p>
-      <div className="linha-botoes">
+      <div className="linha-botoes rodape-fixo">
         <button type="button" className="botao" onClick={aoMudarDestino}>
           Mudar o destino
         </button>

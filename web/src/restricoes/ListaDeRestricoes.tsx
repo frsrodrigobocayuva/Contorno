@@ -92,7 +92,7 @@ export function ListaDeRestricoes({
         As restrições valem só nesta página, sem cadastro. Recarregar ou fechar
         a página apaga tudo.
       </p>
-      <div className="linha-botoes">
+      <div className="linha-botoes rodape-fixo">
         <button type="button" className="botao" onClick={aoNovaRestricao}>
           + Restrição
         </button>

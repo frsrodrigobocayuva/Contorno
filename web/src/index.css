@@ -17,6 +17,7 @@
 
 body {
   margin: 0;
+  overflow: hidden;
 }
 
 button,
@@ -25,14 +26,35 @@ input {
   color: inherit;
 }
 
-/* Celular: campos, mapa e painel empilhados (telas 02 e 03). */
+/* A página tem sempre a altura da tela e nunca rola: quem rola são os campos e o painel, por
+   dentro, e o mapa fica inteiro no lugar (teste do usuário, 2026-11-01). */
+
+/* Celular: campos, mapa e painel empilhados (telas 02 e 03). O mapa guarda pelo menos 240 px. */
 .app {
   position: relative;
   height: 100dvh;
+  overflow: hidden;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  grid-template-rows: auto auto minmax(240px, 1fr) auto;
+  grid-template-rows: auto minmax(0, auto) minmax(240px, 1fr) minmax(0, auto);
   grid-template-areas: 'topo' 'campos' 'mapa' 'base';
+}
+
+.campos,
+.base {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* A ação principal fica à vista no rodapé do painel enquanto o resto rola (telas 07 e 09). */
+.rodape-fixo {
+  position: sticky;
+  bottom: 0;
+  margin: 0 -16px;
+  padding: 12px 16px;
+  background: var(--fundo);
+  border-top: 1px solid var(--borda);
 }
 
 /* Abertura: só o mapa, o nome e o botão (telas 01 e 14). */
@@ -45,11 +67,10 @@ input {
 @media (min-width: 900px) {
   .app:not(.app-abertura) {
     grid-template-columns: 380px minmax(0, 1fr);
-    grid-template-rows: auto auto minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, auto) minmax(0, 1fr);
     grid-template-areas: 'topo mapa' 'campos mapa' 'base mapa';
   }
   .app:not(.app-abertura) .base {
-    align-self: start;
     border-top: 0;
   }
   .app:not(.app-abertura) .topo,
