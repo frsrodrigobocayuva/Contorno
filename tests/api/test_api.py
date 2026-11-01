@@ -10,6 +10,7 @@ from app.api.config import Configuracao
 from app.api.dependencias import Dependencias
 from app.api.main import criar_app
 from app.api.registro import FormatoJSON
+from app.aplicacao.diagnosticador import DiagnosticadorDeInviabilidade
 from app.aplicacao.enderecos import LocalizadorDeEndereco
 from app.aplicacao.orquestrador import OrquestradorDeRota
 from app.aplicacao.restricoes import GestorDeRestricoes
@@ -80,10 +81,11 @@ def api(
     geocodificador: GeocodificadorFalso | None = None,
     graphhopper: Callable[[httpx.Request], httpx.Response] = lambda _: httpx.Response(200),
 ) -> httpx.AsyncClient:
+    motor_da_vez = motor or MotorFalso()
     dependencias = Dependencias(
         CONFIG,
         httpx.AsyncClient(transport=httpx.MockTransport(graphhopper)),
-        OrquestradorDeRota(motor or MotorFalso()),
+        OrquestradorDeRota(motor_da_vez, DiagnosticadorDeInviabilidade(motor_da_vez, 4)),
         LocalizadorDeEndereco(geocodificador or GeocodificadorFalso()),
         GestorDeRestricoes(11),
     )
@@ -393,7 +395,7 @@ async def test_extremo_dentro_de_area_e_422() -> None:
     assert resposta.json()["detalhes"] == [{"area": "a1", "extremo": "ORIGEM"}]
 
 
-async def test_areas_que_bloqueiam_viram_o_aviso_provisorio() -> None:
+async def test_area_que_bloqueia_volta_como_candidata() -> None:
     async with api(MotorFalso(restrita=None)) as cliente:
         resposta = await calcular(cliente, com_areas(("a1", await celulas(cliente, A_LESTE))))
 
@@ -401,10 +403,10 @@ async def test_areas_que_bloqueiam_viram_o_aviso_provisorio() -> None:
     corpo = resposta.json()
     assert (corpo["tipo"], corpo["causa"], corpo["candidatas"]) == (
         "DIAGNOSTICO",
-        "AREAS_BLOQUEIAM",
-        [],
+        "RESTRICAO_UNICA",
+        ["a1"],
     )
-    assert "Remova ou redesenhe" in corpo["mensagem"]
+    assert "Cada uma destas áreas" in corpo["mensagem"]
 
 
 @pytest.mark.parametrize(

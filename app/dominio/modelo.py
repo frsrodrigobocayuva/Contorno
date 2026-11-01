@@ -36,9 +36,6 @@ class CausaDeInviabilidade(StrEnum):
     DESTINO_INALCANCAVEL = "DESTINO_INALCANCAVEL"
     RESTRICAO_UNICA = "RESTRICAO_UNICA"
     COMBINACAO_DE_RESTRICOES = "COMBINACAO_DE_RESTRICOES"
-    # Provisória (plano, 2026-10-30): as áreas bloqueiam, sem dizer qual. Sai no S5-03, quando o
-    # Diagnosticador aponta as candidatas.
-    AREAS_BLOQUEIAM = "AREAS_BLOQUEIAM"
 
 
 class Extremo(StrEnum):
@@ -283,7 +280,6 @@ class Diagnostico:
             (self.causa is CausaDeInviabilidade.DESTINO_INALCANCAVEL and quantas > 0)
             or (self.causa is CausaDeInviabilidade.RESTRICAO_UNICA and quantas < 1)
             or (self.causa is CausaDeInviabilidade.COMBINACAO_DE_RESTRICOES and quantas < 2)
-            or (self.causa is CausaDeInviabilidade.AREAS_BLOQUEIAM and quantas > 0)
         ):
             raise ValueError(f"{self.causa} não admite {quantas} candidata(s)")
 
@@ -303,10 +299,6 @@ _MENSAGENS = {
     CausaDeInviabilidade.COMBINACAO_DE_RESTRICOES: (
         "Nenhuma área sozinha bloqueia o trajeto. É a combinação delas: tirar só uma não abre "
         "caminho."
-    ),
-    CausaDeInviabilidade.AREAS_BLOQUEIAM: (
-        "Não existe caminho que respeite as áreas declaradas. O destino é alcançável sem elas. "
-        "Remova ou redesenhe uma área para abrir caminho."
     ),
 }
 

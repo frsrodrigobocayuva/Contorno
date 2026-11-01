@@ -1,13 +1,13 @@
 """Orquestrador de Rota (UC01): a irrestrita como linha de base e, com restrições, a restrita.
 
 Áreas proíbem e são conferidas pelo Validador (RN01); preferências de via só encarecem, pelo
-Tradutor (UC03, RN06). Sem rota restrita, a resposta é o aviso provisório de que as áreas
-bloqueiam; o diagnóstico que aponta a área entra na S5-03 (plano, 2026-10-30).
+Tradutor (UC03, RN06). Sem rota restrita válida, o Diagnosticador aponta a área (UC05).
 """
 
 import asyncio
 import logging
 
+from app.aplicacao.diagnosticador import DiagnosticadorDeInviabilidade
 from app.dominio import indexador, tradutor
 from app.dominio.excecoes import ExtremoDentroDaArea
 from app.dominio.modelo import (
@@ -26,8 +26,9 @@ log = logging.getLogger("contorno.orquestrador")
 
 
 class OrquestradorDeRota:
-    def __init__(self, motor: MotorDeRotas) -> None:
+    def __init__(self, motor: MotorDeRotas, diagnosticador: DiagnosticadorDeInviabilidade) -> None:
         self._motor = motor
+        self._diagnosticador = diagnosticador
 
     async def calcular(self, consulta: ConsultaDeRota) -> ResultadoComparativo | Diagnostico:
         """A irrestrita e, com áreas, a restrita validada; ou o diagnóstico quando não há rota.
@@ -70,16 +71,13 @@ class OrquestradorDeRota:
         if irrestrita is None:
             return Diagnostico(CausaDeInviabilidade.DESTINO_INALCANCAVEL)
         if restrita is None:
-            # Só área bloqueia; sem área, uma restrita vazia é o próprio destino inalcançável.
-            causa = (
-                CausaDeInviabilidade.AREAS_BLOQUEIAM
-                if areas
-                else CausaDeInviabilidade.DESTINO_INALCANCAVEL
-            )
-            return Diagnostico(causa)
+            # Só área bloqueia (RN03); sem área, uma restrita vazia é o destino inalcançável.
+            if not areas:
+                return Diagnostico(CausaDeInviabilidade.DESTINO_INALCANCAVEL)
+            return await self._diagnosticador.diagnosticar(consulta, opcoes)
         trechos = violacoes(restrita, ContornoProibido(contorno)) if contorno else ()
         if trechos:
             # UC01, exceção C: a rota violadora é descartada e nunca é serializada (RN01).
             log.warning("rota restrita descartada: %d trecho(s) tocam o contorno", len(trechos))
-            return Diagnostico(CausaDeInviabilidade.AREAS_BLOQUEIAM)
+            return await self._diagnosticador.diagnosticar(consulta, opcoes)
         return ResultadoComparativo(irrestrita, restrita, consulta.restricoes)

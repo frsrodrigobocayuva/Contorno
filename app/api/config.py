@@ -19,6 +19,7 @@ class Configuracao:
     cache_validade_s: float
     retangulo: tuple[float, float, float, float]
     resolucao_h3: int = 11
+    concorrencia_do_diagnostico: int = 4
 
     @classmethod
     def do_ambiente(cls, ambiente: Mapping[str, str] = os.environ) -> "Configuracao":
@@ -44,6 +45,7 @@ class Configuracao:
             cache_validade_s=float(ambiente.get("GEOCODER_CACHE_TTL_S", "3600")),
             retangulo=(retangulo[0], retangulo[1], retangulo[2], retangulo[3]),
             resolucao_h3=int(ambiente.get("H3_RESOLUTION", "11")),
+            concorrencia_do_diagnostico=int(ambiente.get("DIAGNOSIS_CONCURRENCY", "4")),
         )
 
     def no_recorte(self, longitude: float, latitude: float) -> bool:
