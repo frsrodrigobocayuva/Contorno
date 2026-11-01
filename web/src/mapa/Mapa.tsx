@@ -1,6 +1,7 @@
 // Mapa Interativo (DAS 7.2): MapLibre com os tiles raster do OpenStreetMap, só os da tela
 // atual, com atribuição (ADR-013), nas cores do mapa (tinta.ts), preso à região atendida, sempre em
 // 2D com o norte para cima. Por cima: as áreas proibidas, as duas rotas e o editor de áreas.
+// No diagnóstico (telas 11 e 12), a área apontada ganha o nome e um contorno mais forte.
 import 'maplibre-gl/dist/maplibre-gl.css'
 import {
   Map as MapLibreMap,
@@ -57,6 +58,8 @@ const VAZIO = { type: 'FeatureCollection' as const, features: [] }
 export interface AreaNoMapa {
   id: string
   contorno: Contorno
+  // O nome, só quando o diagnóstico aponta a área (S5-03).
+  rotuloApontado?: string
 }
 
 // O que a tela pede ao mapa durante o desenho (telas 04 e 05).
@@ -106,10 +109,26 @@ function contornos(areas: AreaNoMapa[] | undefined) {
     type: 'FeatureCollection' as const,
     features: (areas ?? []).map((a) => ({
       type: 'Feature' as const,
-      properties: { id: a.id },
+      properties: { id: a.id, apontada: Boolean(a.rotuloApontado) },
       geometry: a.contorno,
     })),
   }
+}
+
+// O nome fica logo acima do ponto mais ao norte do contorno: nunca cobre a área nem precisa
+// saber onde fica o miolo dela.
+function topo(contorno: Contorno): Coordenadas {
+  let melhor = contorno.coordinates[0][0][0]
+  for (const poligono of contorno.coordinates)
+    for (const ponto of poligono[0]) if (ponto[1] > melhor[1]) melhor = ponto
+  return [melhor[0], melhor[1]]
+}
+
+function rotuloDaArea(texto: string): HTMLElement {
+  const elemento = document.createElement('div')
+  elemento.className = 'rotulo-da-area'
+  elemento.textContent = texto
+  return elemento
 }
 
 // Hachura diagonal da área proibida, como no protótipo (8 × 8 px, traço a 45%).
@@ -156,6 +175,7 @@ export function Mapa({ ref, ...props }: Props) {
   const mapa = useRef<MapLibreMap | null>(null)
   const editor = useRef<EditorDeArea | null>(null)
   const marcadores = useRef<{ A?: Marker; B?: Marker }>({})
+  const rotulos = useRef<Marker[]>([])
   // Sempre as props da última renderização: o load e os eventos do mapa leem daqui.
   const atuais = useRef(props)
 
@@ -231,7 +251,10 @@ export function Mapa({ ref, ...props }: Props) {
         id: 'areas-contorno',
         type: 'line',
         source: 'areas',
-        paint: { 'line-color': '#1A1A1A', 'line-width': 1.5 },
+        paint: {
+          'line-color': '#1A1A1A',
+          'line-width': ['case', ['get', 'apontada'], 3.5, 1.5],
+        },
       })
       novo.addLayer({
         id: 'referencia',
@@ -304,7 +327,23 @@ export function Mapa({ ref, ...props }: Props) {
   }, [rota, rotaRestrita])
 
   useEffect(() => {
-    if (mapa.current) atualizar(mapa.current, 'areas', contornos(areas))
+    const atual = mapa.current
+    if (!atual) return
+    atualizar(atual, 'areas', contornos(areas))
+    for (const rotulo of rotulos.current) rotulo.remove()
+    rotulos.current = (areas ?? []).flatMap((a) =>
+      a.rotuloApontado
+        ? [
+            new Marker({
+              element: rotuloDaArea(a.rotuloApontado),
+              anchor: 'bottom',
+              offset: [0, -4],
+            })
+              .setLngLat(topo(a.contorno))
+              .addTo(atual),
+          ]
+        : [],
+    )
   }, [areas])
 
   useEffect(() => {

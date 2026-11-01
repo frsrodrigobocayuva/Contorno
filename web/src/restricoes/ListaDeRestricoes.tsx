@@ -1,11 +1,13 @@
 // Restrições da consulta (tela 07): cada área com redesenhar e remover. Com o diagnóstico só
-// informativo, remover a área na mão é o caminho depois de um bloqueio (plano, S5-03).
+// informativo, remover a área na mão é o caminho depois de um bloqueio (plano, S5-03); as áreas
+// que o diagnóstico apontou levam a etiqueta "bloqueia o trajeto" até o próximo cálculo.
 import { formatarArea } from '../formato'
 import type { AreaDeclarada } from './areas'
 import type { preferenciasAtivas } from './classes'
 
 interface Props {
   areas: AreaDeclarada[]
+  apontadas?: string[]
   classes: ReturnType<typeof preferenciasAtivas>
   calculando: boolean
   aoRedesenhar: (id: string) => void
@@ -17,6 +19,7 @@ interface Props {
 
 export function ListaDeRestricoes({
   areas,
+  apontadas = [],
   classes,
   calculando,
   aoRedesenhar,
@@ -35,10 +38,17 @@ export function ListaDeRestricoes({
         <ul>
           {areas.map((area) => (
             <li key={area.id} className="quadro">
-              <strong>{area.rotulo}</strong>
-              <span className="dica">
-                desenhada · {formatarArea(area.areaProibidaM2)} proibidos
-              </span>
+              <div className="linha-da-area">
+                <div className="nome-da-area">
+                  <strong>{area.rotulo}</strong>
+                  <span className="dica">
+                    desenhada · {formatarArea(area.areaProibidaM2)} proibidos
+                  </span>
+                </div>
+                {apontadas.includes(area.id) && (
+                  <span className="etiqueta">bloqueia o trajeto</span>
+                )}
+              </div>
               <div className="linha-botoes">
                 <button
                   type="button"

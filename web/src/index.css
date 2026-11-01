@@ -445,6 +445,84 @@ input {
   margin: 0;
 }
 
+.linha-da-area {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.nome-da-area {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+}
+
+/* Área apontada pelo diagnóstico, na lista (tela 07) e no mapa (telas 11 e 12). */
+.etiqueta {
+  flex-shrink: 0;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border: 1.5px solid var(--tinta);
+  border-radius: 999px;
+}
+
+.rotulo-da-area {
+  padding: 3px 6px;
+  border-radius: 3px;
+  background: var(--tinta);
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* Diagnóstico (telas 11 e 12): por que não há rota e quais áreas. */
+.diagnostico {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.diagnostico-cabecalho {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.diagnostico h2 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.diagnostico p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.diagnostico ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--borda-forte);
+  border-radius: 4px;
+}
+
+.diagnostico li {
+  display: flex;
+  align-items: center;
+  min-height: 48px;
+  padding: 0 12px;
+}
+
+.diagnostico li + li {
+  border-top: 1px solid var(--borda);
+}
+
 .lista-restricoes ul {
   margin: 0;
   padding: 0;
