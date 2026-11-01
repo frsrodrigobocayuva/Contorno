@@ -136,7 +136,7 @@ export function PainelDaConferencia({
           desenho.
         </p>
       </div>
-      <div className="linha-botoes">
+      <div className="linha-botoes rodape-fixo">
         <button type="button" className="botao" onClick={aoAjustar}>
           Ajustar
         </button>

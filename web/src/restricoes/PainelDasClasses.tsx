@@ -49,14 +49,16 @@ export function PainelDasClasses({
         Via sem pavimentação depende do que está registrado no mapa. Via sem
         registro de superfície não é penalizada.
       </p>
-      <button
-        type="button"
-        className="botao-principal"
-        disabled={calculando}
-        onClick={aoAplicar}
-      >
-        {calculando ? 'Calculando…' : 'Aplicar e recalcular'}
-      </button>
+      <div className="linha-botoes rodape-fixo">
+        <button
+          type="button"
+          className="botao-principal"
+          disabled={calculando}
+          onClick={aoAplicar}
+        >
+          {calculando ? 'Calculando…' : 'Aplicar e recalcular'}
+        </button>
+      </div>
     </>
   )
 }
