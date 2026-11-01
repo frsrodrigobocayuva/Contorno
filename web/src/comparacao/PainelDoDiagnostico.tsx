@@ -1,6 +1,6 @@
 // Diagnóstico (telas 11 e 12; UC05): por que não há rota e quais áreas. Só informa: quem remove ou
-// redesenha a área é o usuário, na lista de restrições (plano, S5-03). Os textos são os das telas;
-// com uma área só, no singular.
+// redesenha a área é o usuário, na lista de restrições (plano, S5-03). Os textos são os das telas
+// (canvas v26) e dizem o que a busca mede: tirar uma área por vez. Com uma área só, no singular.
 import type { AreaDeclarada } from '../restricoes/areas'
 
 export type CausaDasAreas = 'RESTRICAO_UNICA' | 'COMBINACAO_DE_RESTRICOES'
@@ -14,24 +14,25 @@ interface Props {
 }
 
 function textos(causa: CausaDasAreas, quantas: number) {
+  const titulo = 'Não há rota que respeite todas as áreas'
   if (causa === 'COMBINACAO_DE_RESTRICOES')
     return {
-      titulo: 'Nenhuma área sozinha bloqueia o trajeto',
+      titulo,
       texto:
-        'É a combinação delas: tirar só uma não abre caminho. As áreas envolvidas:',
+        'O destino é alcançável sem restrições. Tirar uma área só não abre caminho. As áreas envolvidas:',
       saida: 'Para seguir, remova ou redesenhe mais de uma.',
     }
   if (quantas === 1)
     return {
-      titulo: 'Não há rota que respeite todas as áreas',
+      titulo,
       texto:
-        'O destino é alcançável sem restrições. Esta área bloqueia o trajeto:',
+        'O destino é alcançável sem restrições. Tirar esta área abre caminho:',
       saida: 'Para seguir, remova ou redesenhe essa área.',
     }
   return {
-    titulo: 'Não há rota que respeite todas as áreas',
+    titulo,
     texto:
-      'O destino é alcançável sem restrições. Cada uma destas áreas, sozinha, bloqueia o trajeto:',
+      'O destino é alcançável sem restrições. Tirar qualquer uma destas áreas abre caminho:',
     saida: 'Para seguir, remova ou redesenhe uma delas.',
   }
 }

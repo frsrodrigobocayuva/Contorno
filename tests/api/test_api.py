@@ -406,7 +406,7 @@ async def test_area_que_bloqueia_volta_como_candidata() -> None:
         "RESTRICAO_UNICA",
         ["a1"],
     )
-    assert "Cada uma destas áreas" in corpo["mensagem"]
+    assert "Tirar qualquer uma" in corpo["mensagem"]
 
 
 @pytest.mark.parametrize(

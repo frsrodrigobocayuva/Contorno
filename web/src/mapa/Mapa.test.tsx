@@ -176,6 +176,25 @@ describe('Mapa', () => {
     })
   })
 
+  it('só uma rota nova enquadra o mapa; a que sai de cena e volta, não', () => {
+    const restrita: Coordenadas[] = [
+      [-51.16, -29.79],
+      [-51.14, -29.69],
+    ]
+    const { rerender } = render(<Mapa rota={ROTA} rotaRestrita={restrita} />)
+    const mapa = MapaFalso.ultimo
+    carregarEDepoisBuscarTiles(mapa)
+    mapa.fitBounds.mockClear()
+
+    // No desenho, a restrita sai do mapa; depois, volta a mesma.
+    rerender(<Mapa rota={ROTA} rotaRestrita={null} />)
+    rerender(<Mapa rota={ROTA} rotaRestrita={restrita} />)
+    expect(mapa.fitBounds).not.toHaveBeenCalled()
+
+    rerender(<Mapa rota={ROTA} rotaRestrita={[...restrita]} />)
+    expect(mapa.fitBounds).toHaveBeenCalledOnce()
+  })
+
   it('fica em 2D, com o norte para cima, sem girar nem inclinar', () => {
     render(<Mapa />)
     const mapa = MapaFalso.ultimo

@@ -577,7 +577,7 @@ describe('App', () => {
           await screen.findByText('Não há rota que respeite todas as áreas'),
         ).toBeInTheDocument()
         expect(
-          screen.getByText(/Esta área bloqueia o trajeto/),
+          screen.getByText(/Tirar esta área abre caminho/),
         ).toBeInTheDocument()
         const lista = screen.getByRole('list', { name: 'Áreas apontadas' })
         expect(within(lista).getByText('Centro')).toBeInTheDocument()
@@ -612,7 +612,7 @@ describe('App', () => {
         }))
 
         expect(
-          await screen.findByText('Nenhuma área sozinha bloqueia o trajeto'),
+          await screen.findByText(/Tirar uma área só não abre caminho/),
         ).toBeInTheDocument()
         expect(
           screen.getByText('Para seguir, remova ou redesenhe mais de uma.'),

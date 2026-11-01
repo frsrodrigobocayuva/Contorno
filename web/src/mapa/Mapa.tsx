@@ -176,6 +176,11 @@ export function Mapa({ ref, ...props }: Props) {
   const editor = useRef<EditorDeArea | null>(null)
   const marcadores = useRef<{ A?: Marker; B?: Marker }>({})
   const rotulos = useRef<Marker[]>([])
+  // As últimas linhas enquadradas: uma rota que só sai de cena e volta não mexe no enquadramento.
+  const enquadradas = useRef<{
+    rota?: Coordenadas[]
+    restrita?: Coordenadas[]
+  }>({})
   // Sempre as props da última renderização: o load e os eventos do mapa leem daqui.
   const atuais = useRef(props)
 
@@ -319,11 +324,19 @@ export function Mapa({ ref, ...props }: Props) {
   }, [origem, destino])
 
   // Antes do load, as fontes ainda não existem: quem desenha é o próprio load, com as props atuais.
+  // Só uma rota nova enquadra o mapa. Ao desenhar uma área, a restrita sai de cena, e o mapa fica
+  // onde o usuário o deixou (S5-03).
   useEffect(() => {
     if (!mapa.current) return
     atualizar(mapa.current, 'rota', linha(rota))
     atualizar(mapa.current, 'rota-restrita', linha(rotaRestrita))
-    enquadrar(mapa.current, [rota, rotaRestrita])
+    const vistas = enquadradas.current
+    const nova =
+      (rota && rota !== vistas.rota) ||
+      (rotaRestrita && rotaRestrita !== vistas.restrita)
+    if (rota) vistas.rota = rota
+    if (rotaRestrita) vistas.restrita = rotaRestrita
+    if (nova) enquadrar(mapa.current, [rota, rotaRestrita])
   }, [rota, rotaRestrita])
 
   useEffect(() => {

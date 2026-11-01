@@ -37,7 +37,7 @@ class Configuracao:
             raise RuntimeError("AREA_BBOX precisa de 4 números: min_lon,min_lat,max_lon,max_lat")
         return cls(
             graphhopper_url=exigir("GRAPHHOPPER_URL"),
-            tempo_maximo_motor_s=float(ambiente.get("ENGINE_TIMEOUT_S", "2")),
+            tempo_maximo_motor_s=float(ambiente.get("ENGINE_TIMEOUT_S", "5")),
             nominatim_url=ambiente.get("NOMINATIM_URL", "https://nominatim.openstreetmap.org"),
             nominatim_user_agent=user_agent,
             tempo_maximo_geocodificador_s=float(ambiente.get("GEOCODER_TIMEOUT_S", "10")),

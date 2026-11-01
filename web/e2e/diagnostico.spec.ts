@@ -40,9 +40,8 @@ async function centroDoDestino(page: Page) {
 }
 
 // Leva o destino para o meio do mapa, para o anel caber inteiro, e aproxima um nível: com a rota
-// inteira na tela, 100 px passam de 1,8 km, e um C desse tamanho deixa cada cálculo restrito perto
-// do limite de 2 s do motor. O arrasto sai de um ponto ao lado do marcador: em cima dele, o mapa
-// não se move.
+// inteira na tela, 100 px passam de 1,8 km, e um C desse tamanho leva cada cálculo restrito a mais
+// de 1 s. O arrasto sai de um ponto ao lado do marcador: em cima dele, o mapa não se move.
 async function centrarNoDestino(page: Page) {
   const mapa = await page.getByRole('region', { name: 'Mapa' }).boundingBox()
   if (!mapa) throw new Error('mapa sem caixa')
@@ -68,7 +67,7 @@ async function desenharC(
 ) {
   await page.getByRole('button', { name: 'Desenhar área' }).click()
   await expect(page.getByText('Desenhar área proibida')).toBeVisible()
-  // Ao entrar no desenho, o mapa volta a enquadrar a rota: o destino é centrado só agora.
+  // Cada rota nova enquadra o mapa de novo: o destino é centrado a cada desenho.
   const destino = await centrarNoDestino(page)
   const pontos = pontosDoC(destino.x, destino.y, inicio, fim)
   for (const { x, y } of pontos) {

@@ -293,12 +293,12 @@ _MENSAGENS = {
         "as preferências que você declarou."
     ),
     CausaDeInviabilidade.RESTRICAO_UNICA: (
-        "Não há rota que respeite todas as áreas. O destino é alcançável sem restrições. Cada uma "
-        "destas áreas, sozinha, bloqueia o trajeto."
+        "Não há rota que respeite todas as áreas. O destino é alcançável sem restrições. Tirar "
+        "qualquer uma destas áreas abre caminho."
     ),
     CausaDeInviabilidade.COMBINACAO_DE_RESTRICOES: (
-        "Nenhuma área sozinha bloqueia o trajeto. É a combinação delas: tirar só uma não abre "
-        "caminho."
+        "Não há rota que respeite todas as áreas. O destino é alcançável sem restrições. Tirar "
+        "uma área só não abre caminho."
     ),
 }
 
