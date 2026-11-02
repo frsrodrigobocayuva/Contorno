@@ -176,11 +176,11 @@ async def test_area_e_regra_vao_no_mesmo_custom_model() -> None:
 
 
 async def test_registra_o_tempo_de_cada_chamada() -> None:
-    chamadas = medicao.abrir()
+    aberta = medicao.abrir()
 
     await adaptador(lambda _: httpx.Response(200, json=RESPOSTA)).calcular(
         CONSULTA, (), OpcoesDeCusto()
     )
 
-    assert len(chamadas) == 1
-    assert chamadas[0] >= 0
+    assert len(aberta.motor) == 1
+    assert aberta.motor[0] >= 0

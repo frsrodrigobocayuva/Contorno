@@ -43,10 +43,20 @@ export class ErroDaApi extends Error {
   }
 }
 
+// A sessão da medição [4] do DAS 8 (S5-05): sorteada a cada abertura da página, só na memória, e
+// mandada em cada pedido para o log separar as sessões. Recarregar começa outra, como as restrições.
+export const SESSAO = crypto.randomUUID()
+
 async function pedir<T>(caminho: string, opcoes?: RequestInit): Promise<T> {
   let resposta: Response
   try {
-    resposta = await fetch(caminho, opcoes)
+    resposta = await fetch(caminho, {
+      ...opcoes,
+      headers: {
+        ...(opcoes?.headers as Record<string, string> | undefined),
+        'X-Sessao': SESSAO,
+      },
+    })
   } catch {
     throw new ErroDaApi(0, 'REDE')
   }

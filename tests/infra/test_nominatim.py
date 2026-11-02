@@ -1,5 +1,6 @@
 """Adaptador Nominatim: política de uso (ADR-013), com as respostas gravadas do S4-03."""
 
+import asyncio
 import json
 from collections.abc import Callable
 from pathlib import Path
@@ -9,6 +10,8 @@ import pytest
 
 from app.dominio.excecoes import GeocodificadorIndisponivel
 from app.dominio.modelo import Coordenada
+from app.infra import medicao
+from app.infra.medicao import Busca
 from app.infra.nominatim import AdaptadorNominatim
 
 pytestmark = pytest.mark.anyio
@@ -166,3 +169,69 @@ async def test_tempo_esgotado_e_servico_indisponivel() -> None:
 
     with pytest.raises(GeocodificadorIndisponivel):
         await adaptador(tratar, Relogio()).localizar("UNISINOS")
+
+
+# Medição [4] do DAS 8: de onde veio cada busca e quanto ela esperou (S5-05)
+
+
+class RelogioQueAnda(Relogio):
+    """Cada leitura avança 0,25 s: a chamada ao Nominatim passa a levar tempo."""
+
+    def __call__(self) -> float:
+        self.agora += 0.25
+        return self.agora
+
+
+async def test_registra_nominatim_cache_e_a_espera_da_vez() -> None:
+    _, tratar = contador()
+    relogio = Relogio()
+    nominatim = adaptador(tratar, relogio)
+    aberta = medicao.abrir()
+
+    await nominatim.localizar("UNISINOS")
+    relogio.agora += 0.4
+    await nominatim.localizar("unisinos")
+    await nominatim.localizar("Rua Independência")
+
+    assert aberta.buscas == [
+        Busca("nominatim", 0.0, 0.0),
+        Busca("cache", 0.0, None),
+        Busca("nominatim", pytest.approx(0.6), 0.0),
+    ]
+
+
+async def test_registra_o_tempo_da_chamada_ao_nominatim() -> None:
+    _, tratar = contador()
+    aberta = medicao.abrir()
+
+    await adaptador(tratar, RelogioQueAnda()).localizar("UNISINOS")
+
+    (busca,) = aberta.buscas
+    assert busca.origem == "nominatim"
+    assert busca.nominatim_s == pytest.approx(0.25)
+
+
+@pytest.mark.parametrize("falha", ["status", "tempo"])
+async def test_registra_a_busca_com_erro(falha: str) -> None:
+    def tratar(_: httpx.Request) -> httpx.Response:
+        if falha == "tempo":
+            raise httpx.ReadTimeout("tempo")
+        return httpx.Response(503)
+
+    aberta = medicao.abrir()
+
+    with pytest.raises(GeocodificadorIndisponivel):
+        await adaptador(tratar, Relogio()).localizar("UNISINOS")
+
+    assert [b.origem for b in aberta.buscas] == ["erro"]
+
+
+async def test_cache_achado_depois_da_trava_tambem_conta() -> None:
+    """Duas buscas iguais ao mesmo tempo: a segunda espera a trava e acha o cache."""
+    _, tratar = contador()
+    nominatim = adaptador(tratar, Relogio())
+    aberta = medicao.abrir()
+
+    await asyncio.gather(nominatim.localizar("UNISINOS"), nominatim.localizar("UNISINOS"))
+
+    assert sorted(b.origem for b in aberta.buscas) == ["cache", "nominatim"]
