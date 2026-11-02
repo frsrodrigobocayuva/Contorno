@@ -1,9 +1,14 @@
 """Log em JSON por linha (plano, A9): uma linha por requisição da API, com o tempo total e o de
 cada chamada ao motor (DAS 6.12). O texto buscado não vai para o log: pode ser o endereço de alguém.
+
+Para a medição [4] do DAS 8 (buscas por sessão), a linha leva também a sessão, um identificador
+que o navegador sorteia a cada abertura da página e manda no cabeçalho X-Sessao, e, nas buscas de
+endereço, de onde veio a resposta e quanto ela esperou (S5-05).
 """
 
 import json
 import logging
+import re
 import sys
 import time
 from collections.abc import Awaitable, Callable
@@ -13,7 +18,9 @@ from fastapi import FastAPI, Request, Response
 
 from app.infra import medicao
 
-ROTAS_DA_API = ("/rotas", "/enderecos", "/health")
+ROTAS_DA_API = ("/rotas", "/restricoes", "/enderecos", "/health")
+# Só um UUID entra no log: o cabeçalho vem do navegador, e qualquer outra coisa é descartada.
+_SESSAO = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
 
 log = logging.getLogger("contorno.requisicoes")
 
@@ -50,7 +57,8 @@ def registrar_requisicoes(app: FastAPI) -> None:
     ) -> Response:
         if not request.url.path.startswith(ROTAS_DA_API):
             return await seguinte(request)
-        chamadas = medicao.abrir()
+        aberta = medicao.abrir()
+        sessao = request.headers.get("x-sessao", "").lower()
         inicio = time.perf_counter()
         status = 500
         try:
@@ -66,7 +74,26 @@ def registrar_requisicoes(app: FastAPI) -> None:
                         "caminho": request.url.path,
                         "status": status,
                         "ms_total": round((time.perf_counter() - inicio) * 1000, 1),
-                        "ms_motor": [round(s * 1000, 1) for s in chamadas],
+                        "sessao": sessao if _SESSAO.fullmatch(sessao) else None,
+                        "ms_motor": [round(s * 1000, 1) for s in aberta.motor],
+                        **(
+                            {
+                                "buscas": [
+                                    {
+                                        "origem": b.origem,
+                                        "ms_espera": round(b.espera_s * 1000, 1),
+                                        "ms_nominatim": (
+                                            None
+                                            if b.nominatim_s is None
+                                            else round(b.nominatim_s * 1000, 1)
+                                        ),
+                                    }
+                                    for b in aberta.buscas
+                                ]
+                            }
+                            if aberta.buscas
+                            else {}
+                        ),
                     }
                 },
             )

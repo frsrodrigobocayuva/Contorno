@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { buscarEnderecos, calcularRota, ErroDaApi } from './cliente'
+import { buscarEnderecos, calcularRota, ErroDaApi, SESSAO } from './cliente'
 
 afterEach(() => {
   vi.unstubAllGlobals()
@@ -16,7 +16,7 @@ describe('Cliente da API', () => {
 
     expect(fetch).toHaveBeenCalledWith('/rotas/calculo', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'X-Sessao': SESSAO },
       body: JSON.stringify({
         origem: [-51.15, -29.79],
         destino: [-51.14, -29.69],
@@ -35,8 +35,30 @@ describe('Cliente da API', () => {
 
     expect(fetch).toHaveBeenCalledWith(
       '/enderecos?q=Rua%20Independ%C3%AAncia%2C%20S%C3%A3o%20Leopoldo',
-      undefined,
+      { headers: { 'X-Sessao': SESSAO } },
     )
+  })
+
+  it('a sessão é um UUID sorteado uma vez, o mesmo em todos os pedidos', async () => {
+    const fetch = vi.fn(
+      async () => new Response(JSON.stringify({ lugares: [], motivo: null })),
+    )
+    vi.stubGlobal('fetch', fetch)
+
+    await buscarEnderecos('UNISINOS')
+    await buscarEnderecos('Feevale')
+
+    expect(SESSAO).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
+    )
+    const sessoes = fetch.mock.calls.map(
+      (chamada) =>
+        (chamada as unknown as [string, RequestInit])[1].headers as Record<
+          string,
+          string
+        >,
+    )
+    expect(sessoes.map((h) => h['X-Sessao'])).toEqual([SESSAO, SESSAO])
   })
 
   it('traduz o erro da API no formato único', async () => {

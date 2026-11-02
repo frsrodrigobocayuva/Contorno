@@ -207,7 +207,9 @@ describe('App', () => {
       }),
     )
 
-    expect(fetch).toHaveBeenCalledWith('/enderecos?q=UNISINOS', undefined)
+    expect(fetch).toHaveBeenCalledWith('/enderecos?q=UNISINOS', {
+      headers: { 'X-Sessao': expect.any(String) },
+    })
     expect(screen.getByLabelText('Origem')).toHaveValue(
       'Universidade do Vale do Rio dos Sinos',
     )

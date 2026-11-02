@@ -274,6 +274,49 @@ async def test_cada_requisicao_vira_uma_linha_json_sem_o_texto_buscado(
     assert "minha casa" not in json.dumps(linhas)
 
 
+# Medição [4] do DAS 8 (S5-05): a sessão e as buscas no log
+
+SESSAO = "0f8fad5b-d9cb-469f-a165-70867728950e"
+
+
+def linhas_do_log(caplog: pytest.LogCaptureFixture) -> list[dict[str, object]]:
+    return [
+        json.loads(FormatoJSON().format(r))
+        for r in caplog.records
+        if r.name == "contorno.requisicoes"
+    ]
+
+
+async def test_o_log_leva_a_sessao_a_busca_e_as_restricoes(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    caplog.set_level("INFO", logger="contorno.requisicoes")
+
+    async with api() as cliente:
+        await cliente.get("/enderecos", params={"q": "UNISINOS"}, headers={"X-Sessao": SESSAO})
+        await definir_area(cliente, {"poligono": A_LESTE})
+
+    busca, area = linhas_do_log(caplog)
+    assert busca["sessao"] == SESSAO
+    assert busca["caminho"] == "/enderecos"
+    assert area["caminho"] == "/restricoes/area"
+    assert area["sessao"] is None
+    assert "buscas" not in area
+
+
+@pytest.mark.parametrize("cabecalho", ["nao-e-uuid", "<script>", SESSAO + "x"])
+async def test_sessao_que_nao_e_uuid_fica_fora_do_log(
+    cabecalho: str, caplog: pytest.LogCaptureFixture
+) -> None:
+    caplog.set_level("INFO", logger="contorno.requisicoes")
+
+    async with api() as cliente:
+        await cliente.get("/health", headers={"X-Sessao": cabecalho})
+
+    (linha,) = linhas_do_log(caplog)
+    assert linha["sessao"] is None
+
+
 # Áreas (S5-01): POST /restricoes/area e o cálculo com áreas
 
 

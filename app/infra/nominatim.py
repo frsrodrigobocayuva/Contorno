@@ -13,6 +13,7 @@ import httpx
 
 from app.dominio.excecoes import GeocodificadorIndisponivel
 from app.dominio.modelo import Coordenada, Lugar
+from app.infra.medicao import Busca, registrar_busca
 
 INTERVALO_MINIMO_S = 1.0
 
@@ -46,15 +47,19 @@ class AdaptadorNominatim:
     async def localizar(self, texto: str) -> list[Lugar]:
         chave = " ".join(texto.split()).casefold()
         if (lugares := self._do_cache(chave)) is not None:
+            registrar_busca(Busca("cache", 0.0, None))
             return lugares
+        inicio = self._relogio()
         async with self._trava:
             # Outra requisição pode ter buscado o mesmo texto enquanto esta esperava a trava.
             if (lugares := self._do_cache(chave)) is not None:
+                registrar_busca(Busca("cache", self._relogio() - inicio, None))
                 return lugares
             if self._ultima_chamada is not None:
                 espera = self._ultima_chamada + INTERVALO_MINIMO_S - self._relogio()
                 if espera > 0:
                     await self._dormir(espera)
+            chamada = self._relogio()
             try:
                 resposta = await self._cliente.get(
                     f"{self._url}/search",
@@ -70,9 +75,12 @@ class AdaptadorNominatim:
                     timeout=self._tempo_maximo_s,
                 )
             except httpx.HTTPError as erro:
+                registrar_busca(Busca("erro", chamada - inicio, self._relogio() - chamada))
                 raise GeocodificadorIndisponivel(str(erro)) from erro
             finally:
                 self._ultima_chamada = self._relogio()
+        origem = "nominatim" if resposta.status_code == 200 else "erro"
+        registrar_busca(Busca(origem, chamada - inicio, self._ultima_chamada - chamada))
         if resposta.status_code != 200:
             raise GeocodificadorIndisponivel(f"Nominatim respondeu {resposta.status_code}")
         lugares = [
