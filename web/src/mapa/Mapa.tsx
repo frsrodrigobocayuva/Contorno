@@ -23,6 +23,7 @@ import {
   degradeDaVarredura,
   DURACAO,
   movimentoReduzido,
+  posicaoDaVarredura,
   trechoAte,
 } from '../movimento'
 import {
@@ -296,6 +297,17 @@ export function Mapa({ ref, ...props }: Props) {
       ponteiro = evento.pointerType
     }
     container.addEventListener('pointerdown', aoApontar, { capture: true })
+    // Quando a coluna do painel aparece ou some (computador), o mapa muda de largura de uma vez.
+    // O conteúdo fica parado na tela: a câmera anda o tanto que o meio do mapa andou. Antes, a
+    // coluna abria animando a largura, e o mapa tremia a cada quadro (teste do usuário, 2026-11-02).
+    let caixa = container.getBoundingClientRect()
+    novo.on('resize', () => {
+      const agora = container.getBoundingClientRect()
+      const dx = agora.left + agora.width / 2 - (caixa.left + caixa.width / 2)
+      caixa = agora
+      if (dx) novo.panBy([dx, 0], { duration: 0 })
+    })
+
     novo.on('dblclick', (evento) => {
       const aoCancelar = atuais.current.aoCancelar
       if (ponteiro !== 'mouse' || !aoCancelar) return
@@ -529,9 +541,9 @@ export function Mapa({ ref, ...props }: Props) {
     if (novaRota || novaRestrita) enquadrar(atual, [rota, rotaRestrita])
   }, [rota, rotaRestrita])
 
-  // O brilho da restrita pulsa enquanto ela está no mapa (M1), e um traço claro corre de A a B a
-  // cada 3 s, começando depois que a linha termina de ser desenhada (M1b), a uns 30 quadros por
-  // segundo. Com movimento reduzido, o brilho fica parado e não há traço.
+  // O brilho da restrita pulsa enquanto ela está no mapa (M1), e uma faixa clara corre de A a B
+  // sem pausa, começando depois que a linha termina de ser desenhada (M1b), a uns 30 quadros por
+  // segundo. Com movimento reduzido, o brilho fica parado e não há faixa.
   useEffect(() => {
     const atual = mapa.current
     if (!atual || !rotaRestrita || movimentoReduzido()) return
@@ -543,12 +555,8 @@ export function Mapa({ ref, ...props }: Props) {
       if (agora - ultimo >= 33 && atual.getLayer('rota-restrita-brilho')) {
         ultimo = agora
         const desdeODesenho = agora - inicio - DURACAO.rota
-        const fase =
-          desdeODesenho < 0 ? -1 : desdeODesenho % DURACAO.cicloDaVarredura
         const posicao =
-          fase >= 0 && fase < DURACAO.varredura
-            ? -0.08 + 1.16 * (fase / DURACAO.varredura)
-            : 2
+          desdeODesenho < 0 ? 2 : posicaoDaVarredura(desdeODesenho)
         if (posicao !== 2 || ultimaPosicao !== 2) {
           atual.setPaintProperty(
             'rota-restrita-varredura',

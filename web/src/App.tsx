@@ -2,7 +2,13 @@
 // Telas do protótipo aprovado: 01/14 abertura, 02 origem e destino, 03 rota normal, 04 desenhar
 // área, 05 contorno das células, 06 rota restrita e custo, 07 restrições, 08 raio, 09 classes de
 // via, 10 conflito, 11 e 12 diagnóstico, 13 avisos, 16 confirmar cancelar.
-import { useCallback, useEffect, useRef, useState } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type SetStateAction,
+} from 'react'
 import {
   calcularRota,
   definirArea,
@@ -155,7 +161,15 @@ function erroDoDesenho(erro: unknown): string {
 }
 
 function App() {
-  const [etapa, setEtapa] = useState<Etapa>('abertura')
+  const [etapa, setEtapaBruta] = useState<Etapa>('abertura')
+  // No computador, o painel desliza por cima do mapa ao começar e ao voltar para a abertura (pedido
+  // do usuário, 2026-11-02). A classe do deslize sai só quando a tela muda: se saísse antes, a
+  // animação de troca de tela recomeçava nos mesmos elementos, e o painel piscava.
+  const [painel, setPainel] = useState<'entrando' | 'saindo' | null>(null)
+  const setEtapa = useCallback((proxima: SetStateAction<Etapa>) => {
+    setPainel(null)
+    setEtapaBruta(proxima)
+  }, [])
   const [campoAtivo, setCampoAtivo] = useState<Campo>('origem')
   const [origem, setOrigem] = useState<Ponto | null>(null)
   const [destino, setDestino] = useState<Ponto | null>(null)
@@ -210,7 +224,21 @@ function App() {
     setCalculando(false)
     setCampoAtivo('origem')
     setEtapa('pontos')
-  }, [])
+  }, [setEtapa])
+
+  // Na volta, a abertura só vem depois que o painel saiu.
+  function comecar() {
+    setEtapa('pontos')
+    if (!movimentoReduzido() && noComputador()) setPainel('entrando')
+  }
+  const voltarParaAbertura = useCallback(() => {
+    if (movimentoReduzido() || !noComputador()) {
+      setEtapa('abertura')
+      return
+    }
+    setPainel('saindo')
+    setTimeout(() => setEtapa('abertura'), DURACAO.painelSai)
+  }, [setEtapa])
 
   // Sair do desenho, do raio ou da conferência sem aplicar a área.
   const sairDaArea = useCallback(() => {
@@ -219,7 +247,7 @@ function App() {
     setRaio(null)
     setErroDoDesenhoAtual(null)
     setEtapa('rota')
-  }, [])
+  }, [setEtapa])
 
   // Os atalhos (Esc e duplo clique no mapa) perguntam antes de apagar uma rota calculada; o botão
   // "Cancelar rota" cancela direto (pedido do usuário, S5-04; tela 16).
@@ -260,7 +288,7 @@ function App() {
         etapa === 'raio'
       )
         sairDaArea()
-      else if (etapa === 'pontos' && vazio) setEtapa('abertura')
+      else if (etapa === 'pontos' && vazio) voltarParaAbertura()
       else pedirCancelar()
     }
     window.addEventListener('keydown', aoTeclar)
@@ -272,6 +300,7 @@ function App() {
     fecharJanela,
     pedirCancelar,
     sairDaArea,
+    voltarParaAbertura,
   ])
 
   function marcar(campo: Campo, ponto: Ponto) {
@@ -290,7 +319,7 @@ function App() {
   // Na abertura, um toque no mapa (sem arrastar) faz o mesmo que Começar, sem marcar ponto. Fora
   // da região atendida, o toque não marca A nem B, como no desenho da área (2026-11-01).
   function tocarNoMapa(coordenadas: Coordenadas) {
-    if (etapa === 'abertura') setEtapa('pontos')
+    if (etapa === 'abertura') comecar()
     else if (etapa === 'raio')
       escolherCentro({ nome: PONTO_NO_MAPA, coordenadas })
     else if (etapa !== 'pontos') return
@@ -519,14 +548,22 @@ function App() {
   const comRota = etapa !== 'abertura' && etapa !== 'pontos'
 
   return (
-    <div className={etapa === 'abertura' ? 'app app-abertura' : 'app'}>
+    <div
+      className={[
+        'app',
+        etapa === 'abertura' && 'app-abertura',
+        painel && `painel-${painel}`,
+      ]
+        .filter(Boolean)
+        .join(' ')}
+    >
       {etapa === 'pontos' && (
         <header className="topo" key={`topo-${etapa}`}>
           <button
             type="button"
             className="voltar"
             aria-label="Voltar para a abertura"
-            onClick={() => setEtapa('abertura')}
+            onClick={voltarParaAbertura}
           >
             ‹
           </button>
@@ -672,7 +709,7 @@ function App() {
           <button
             type="button"
             className="botao-principal comecar"
-            onClick={() => setEtapa('pontos')}
+            onClick={comecar}
           >
             Começar
           </button>
@@ -832,6 +869,13 @@ function App() {
         />
       )}
     </div>
+  )
+}
+
+function noComputador(): boolean {
+  return (
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia('(min-width: 900px)').matches
   )
 }
 

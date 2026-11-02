@@ -71,18 +71,8 @@ input {
   grid-template-areas: 'mapa';
 }
 
-/* Computador: painel lateral e mapa (tela 15). Na abertura, a coluna do painel existe com
-   largura zero; ao tocar em Começar, ela abre deslizando até 380 px (pedido do usuário,
-   2026-11-02). */
+/* Computador: painel lateral e mapa (tela 15). */
 @media (min-width: 900px) {
-  .app {
-    transition: grid-template-columns 350ms ease-out;
-  }
-  .app.app-abertura {
-    grid-template-columns: 0px minmax(0, 1fr);
-    grid-template-rows: auto minmax(0, auto) minmax(0, 1fr);
-    grid-template-areas: 'topo mapa' 'campos mapa' 'base mapa';
-  }
   .app:not(.app-abertura) {
     grid-template-columns: 380px minmax(0, 1fr);
     grid-template-rows: auto minmax(0, auto) minmax(0, 1fr);
@@ -961,5 +951,45 @@ input[type='range'] {
     animation: none !important;
     width: 100%;
     opacity: 0.6;
+  }
+}
+
+/* O painel lateral desliza por cima do mapa ao tocar em Começar e ao voltar para a abertura
+   (computador; pedido do usuário, 2026-11-02). Só por transform: a largura de nada muda a cada
+   quadro. O mapa muda de largura de uma vez e fica parado (Mapa.tsx); atrás do painel, a cor do
+   mapa. */
+@keyframes painel-entra {
+  from {
+    translate: -100% 0;
+  }
+}
+
+@keyframes painel-sai {
+  to {
+    translate: -100% 0;
+  }
+}
+
+@media (min-width: 900px) {
+  .app:not(.app-abertura) {
+    background: var(--mapa);
+  }
+
+  .app:not(.app-abertura) .topo,
+  .app:not(.app-abertura) .campos,
+  .app:not(.app-abertura) .base {
+    background: var(--fundo);
+  }
+
+  .app.painel-entrando .topo,
+  .app.painel-entrando .campos,
+  .app.painel-entrando .base {
+    animation: painel-entra 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+
+  .app.painel-saindo .topo,
+  .app.painel-saindo .campos,
+  .app.painel-saindo .base {
+    animation: painel-sai 180ms ease-in forwards;
   }
 }

@@ -19,28 +19,43 @@ export const DURACAO = {
   contagem: 400,
   // Um ciclo do brilho da rota restrita (M1).
   brilho: 2500,
-  // O traço claro que corre pela restrita de A a B (M1b), e de quanto em quanto tempo ele volta.
+  // A faixa clara que corre pela restrita (M1b): o meio dela vai de A a B em 0,9 s, sem pausa.
   varredura: 900,
-  cicloDaVarredura: 3000,
+  // O painel lateral deslizando por cima do mapa, no computador: ao começar e ao voltar.
+  painelEntra: 220,
+  painelSai: 180,
 }
 
-// O traço claro da varredura (M1b; pedido do usuário, 2026-11-02): um branco quente, para não
-// destoar do fundo areia.
-const CLARO = 'rgba(255, 248, 230, 0.9)'
+// A faixa clara da varredura (M1b; pedido do usuário, 2026-11-02): um branco quente, para não
+// destoar do fundo areia, mais forte no meio e suave nas pontas.
+const CLARO = 'rgba(255, 248, 230, 0.85)'
+const MEIO_CLARO = 'rgba(255, 248, 230, 0.4)'
 const SEM_COR = 'rgba(255, 248, 230, 0)'
 
-// As paradas do degradê da varredura ao longo da linha (`line-progress`, de 0 a 1): sem cor, claro
-// em `posicao` e sem cor de novo, numa faixa de `largura`. Fora de 0 a 1, a linha fica sem traço.
+// A faixa ocupa um quarto da linha: metade dela para cada lado do meio.
+const MEIA_FAIXA = 0.125
+
+// Onde está o meio da faixa, `ms` depois de a linha terminar de ser desenhada: ela entra por A, sai
+// por B e recomeça em A sem pausa, sempre na mesma velocidade (escolha do usuário, 2026-11-02).
+export function posicaoDaVarredura(ms: number, meiaFaixa = MEIA_FAIXA): number {
+  const ciclo = DURACAO.varredura * (1 + 2 * meiaFaixa)
+  return -meiaFaixa + (((ms % ciclo) + ciclo) % ciclo) / DURACAO.varredura
+}
+
+// As paradas do degradê da varredura ao longo da linha (`line-progress`, de 0 a 1): sem cor, meio
+// claro, claro em `posicao`, meio claro e sem cor de novo. Fora de 0 a 1, a linha fica sem faixa.
 // As paradas saem em ordem crescente e sem repetir, como o MapLibre exige.
 export function degradeDaVarredura(
   posicao: number,
-  largura = 0.08,
+  meiaFaixa = MEIA_FAIXA,
 ): (number | string)[] {
   const pontos: [number, string][] = [
     [0, SEM_COR],
-    [posicao - largura, SEM_COR],
+    [posicao - meiaFaixa, SEM_COR],
+    [posicao - meiaFaixa / 2, MEIO_CLARO],
     [posicao, CLARO],
-    [posicao + largura, SEM_COR],
+    [posicao + meiaFaixa / 2, MEIO_CLARO],
+    [posicao + meiaFaixa, SEM_COR],
     [1, SEM_COR],
   ]
   const saida: (number | string)[] = []
