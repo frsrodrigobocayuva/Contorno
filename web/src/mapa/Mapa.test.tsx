@@ -46,6 +46,11 @@ class MapaFalso {
   addLayer(camada: Record<string, unknown>) {
     this.camadas.push(camada)
   }
+  getLayer(id: string) {
+    return this.camadas.find((c) => c.id === id)
+  }
+  setPaintProperty = vi.fn()
+  setFeatureState = vi.fn()
   getSource(id: string) {
     return this.fontes[id]
   }
@@ -350,7 +355,12 @@ describe('Mapa', () => {
     expect(camada('areas-contorno')).toMatchObject({
       paint: {
         'line-color': ['case', ['get', 'apontada'], '#b3261e', '#1a1a1a'],
-        'line-width': ['case', ['get', 'apontada'], 3.5, 1.5],
+        'line-width': [
+          'case',
+          ['get', 'apontada'],
+          ['+', 3.5, ['*', 4, ['coalesce', ['feature-state', 'pulso'], 0]]],
+          1.5,
+        ],
       },
     })
     expect(camada('areas-hachura')).toMatchObject({
@@ -380,6 +390,54 @@ describe('Mapa', () => {
     recusas[0]('FORA_DA_REGIAO')
 
     expect(aoRecusarDesenho).toHaveBeenCalledWith('FORA_DA_REGIAO')
+  })
+
+  it('a restrita tem um brilho por baixo, acima da irrestrita (M1)', () => {
+    render(<Mapa />)
+    const mapa = MapaFalso.ultimo
+    mapa.disparar('load')
+
+    const ids = mapa.camadas.map((c) => c.id)
+    expect(ids.slice(-4)).toEqual([
+      'rota-irrestrita',
+      'rota-restrita-brilho',
+      'rota-restrita',
+      'rota-restrita-varredura',
+    ])
+    expect(mapa.getLayer('rota-restrita-varredura')).toMatchObject({
+      source: 'rota-restrita',
+      paint: { 'line-width': 5 },
+    })
+    expect(mapa.getLayer('rota-restrita-brilho')).toMatchObject({
+      source: 'rota-restrita',
+      paint: { 'line-blur': 6, 'line-opacity': 0.35 },
+    })
+  })
+
+  it('a área nova entra pela opacidade por área (M5), já no fim com movimento reduzido', () => {
+    const contorno = {
+      type: 'MultiPolygon' as const,
+      coordinates: [
+        [
+          [
+            [-51.15, -29.76],
+            [-51.14, -29.76],
+            [-51.14, -29.75],
+            [-51.15, -29.76],
+          ] as [number, number][],
+        ],
+      ],
+    }
+    const { rerender } = render(<Mapa />)
+    const mapa = MapaFalso.ultimo
+    carregarEDepoisBuscarTiles(mapa)
+
+    rerender(<Mapa areas={[{ id: 'a1', contorno }]} />)
+
+    expect(mapa.setFeatureState).toHaveBeenLastCalledWith(
+      { source: 'areas', id: 'a1' },
+      { opacidade: 1 },
+    )
   })
 
   it('liga o editor com o desenho e desliga sem ele', () => {

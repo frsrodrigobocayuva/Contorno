@@ -2,7 +2,13 @@
 // Telas do protótipo aprovado: 01/14 abertura, 02 origem e destino, 03 rota normal, 04 desenhar
 // área, 05 contorno das células, 06 rota restrita e custo, 07 restrições, 08 raio, 09 classes de
 // via, 10 conflito, 11 e 12 diagnóstico, 13 avisos, 16 confirmar cancelar.
-import { useCallback, useEffect, useRef, useState } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type SetStateAction,
+} from 'react'
 import {
   calcularRota,
   definirArea,
@@ -15,6 +21,7 @@ import {
 } from './api/cliente'
 import { Aviso } from './Aviso'
 import { ConfirmarCancelar } from './ConfirmarCancelar'
+import { DURACAO, movimentoReduzido } from './movimento'
 import { PainelDaRota } from './comparacao/PainelDaRota'
 import {
   PainelDoDiagnostico,
@@ -154,7 +161,15 @@ function erroDoDesenho(erro: unknown): string {
 }
 
 function App() {
-  const [etapa, setEtapa] = useState<Etapa>('abertura')
+  const [etapa, setEtapaBruta] = useState<Etapa>('abertura')
+  // No computador, o painel desliza por cima do mapa ao começar e ao voltar para a abertura (pedido
+  // do usuário, 2026-11-02). A classe do deslize sai só quando a tela muda: se saísse antes, a
+  // animação de troca de tela recomeçava nos mesmos elementos, e o painel piscava.
+  const [painel, setPainel] = useState<'entrando' | 'saindo' | null>(null)
+  const setEtapa = useCallback((proxima: SetStateAction<Etapa>) => {
+    setPainel(null)
+    setEtapaBruta(proxima)
+  }, [])
   const [campoAtivo, setCampoAtivo] = useState<Campo>('origem')
   const [origem, setOrigem] = useState<Ponto | null>(null)
   const [destino, setDestino] = useState<Ponto | null>(null)
@@ -178,6 +193,7 @@ function App() {
   const [conferencia, setConferencia] = useState<Conferencia | null>(null)
   const [raio, setRaio] = useState<RascunhoDoRaio | null>(null)
   const [confirmandoCancelar, setConfirmandoCancelar] = useState(false)
+  const [saindoDaJanela, setSaindoDaJanela] = useState(false)
   const [nome, setNome] = useState('')
   const [aviso, setAviso] = useState<AvisoDaRota | null>(null)
   const [diagnostico, setDiagnostico] = useState<DiagnosticoDasAreas | null>(
@@ -202,12 +218,27 @@ function App() {
     setConferencia(null)
     setRaio(null)
     setConfirmandoCancelar(false)
+    setSaindoDaJanela(false)
     setAviso(null)
     setDiagnostico(null)
     setCalculando(false)
     setCampoAtivo('origem')
     setEtapa('pontos')
-  }, [])
+  }, [setEtapa])
+
+  // Na volta, a abertura só vem depois que o painel saiu.
+  function comecar() {
+    setEtapa('pontos')
+    if (!movimentoReduzido() && noComputador()) setPainel('entrando')
+  }
+  const voltarParaAbertura = useCallback(() => {
+    if (movimentoReduzido() || !noComputador()) {
+      setEtapa('abertura')
+      return
+    }
+    setPainel('saindo')
+    setTimeout(() => setEtapa('abertura'), DURACAO.painelSai)
+  }, [setEtapa])
 
   // Sair do desenho, do raio ou da conferência sem aplicar a área.
   const sairDaArea = useCallback(() => {
@@ -216,7 +247,7 @@ function App() {
     setRaio(null)
     setErroDoDesenhoAtual(null)
     setEtapa('rota')
-  }, [])
+  }, [setEtapa])
 
   // Os atalhos (Esc e duplo clique no mapa) perguntam antes de apagar uma rota calculada; o botão
   // "Cancelar rota" cancela direto (pedido do usuário, S5-04; tela 16).
@@ -225,6 +256,19 @@ function App() {
     if (temRota) setConfirmandoCancelar(true)
     else cancelar()
   }, [temRota, cancelar])
+
+  // A janela sai com fade (P8); com movimento reduzido, fecha na hora.
+  const fecharJanela = useCallback(() => {
+    if (movimentoReduzido()) {
+      setConfirmandoCancelar(false)
+      return
+    }
+    setSaindoDaJanela(true)
+    setTimeout(() => {
+      setConfirmandoCancelar(false)
+      setSaindoDaJanela(false)
+    }, DURACAO.saida)
+  }, [])
 
   // O Esc desfaz um nível por vez: com a janela de confirmar aberta, fecha a janela; no desenho,
   // no raio e na conferência, desiste só da área; nas outras telas, pede para cancelar a rota;
@@ -236,7 +280,7 @@ function App() {
     if (etapa === 'abertura') return
     function aoTeclar(evento: KeyboardEvent) {
       if (evento.key !== 'Escape') return
-      if (confirmandoCancelar) setConfirmandoCancelar(false)
+      if (confirmandoCancelar) fecharJanela()
       else if (
         etapa === 'desenhar' ||
         etapa === 'conferir' ||
@@ -244,12 +288,20 @@ function App() {
         etapa === 'raio'
       )
         sairDaArea()
-      else if (etapa === 'pontos' && vazio) setEtapa('abertura')
+      else if (etapa === 'pontos' && vazio) voltarParaAbertura()
       else pedirCancelar()
     }
     window.addEventListener('keydown', aoTeclar)
     return () => window.removeEventListener('keydown', aoTeclar)
-  }, [etapa, vazio, confirmandoCancelar, pedirCancelar, sairDaArea])
+  }, [
+    etapa,
+    vazio,
+    confirmandoCancelar,
+    fecharJanela,
+    pedirCancelar,
+    sairDaArea,
+    voltarParaAbertura,
+  ])
 
   function marcar(campo: Campo, ponto: Ponto) {
     if (campo === 'origem') {
@@ -267,7 +319,7 @@ function App() {
   // Na abertura, um toque no mapa (sem arrastar) faz o mesmo que Começar, sem marcar ponto. Fora
   // da região atendida, o toque não marca A nem B, como no desenho da área (2026-11-01).
   function tocarNoMapa(coordenadas: Coordenadas) {
-    if (etapa === 'abertura') setEtapa('pontos')
+    if (etapa === 'abertura') comecar()
     else if (etapa === 'raio')
       escolherCentro({ nome: PONTO_NO_MAPA, coordenadas })
     else if (etapa !== 'pontos') return
@@ -291,10 +343,14 @@ function App() {
         [...paraRestricoes(comAreas), ...paraPreferencias(comNiveis)],
       )
       if (esta !== consulta.current) return
+      // A resposta leva para a tela da rota só quem ainda estava esperando por ela, em origem e
+      // destino. Quem foi para a lista de restrições, o desenho ou as classes enquanto calculava
+      // fica onde está, e a rota se atualiza no mapa (CI vermelho depois do PR #20).
+      const paraARota = (atual: Etapa) => (atual === 'pontos' ? 'rota' : atual)
       if (resposta.tipo === 'ROTAS') {
         setRota(resposta.irrestrita)
         setRestrita(resposta.restrita ?? null)
-        setEtapa('rota')
+        setEtapa(paraARota)
       } else if (resposta.causa === 'DESTINO_INALCANCAVEL') {
         setAviso({
           titulo: 'Não existe caminho até este destino',
@@ -307,7 +363,7 @@ function App() {
           causa: resposta.causa,
           candidatas: resposta.candidatas,
         })
-        setEtapa('rota')
+        setEtapa(paraARota)
       }
     } catch (erro) {
       if (esta === consulta.current) setAviso(avisoDoErro(erro, comAreas))
@@ -492,14 +548,22 @@ function App() {
   const comRota = etapa !== 'abertura' && etapa !== 'pontos'
 
   return (
-    <div className={etapa === 'abertura' ? 'app app-abertura' : 'app'}>
+    <div
+      className={[
+        'app',
+        etapa === 'abertura' && 'app-abertura',
+        painel && `painel-${painel}`,
+      ]
+        .filter(Boolean)
+        .join(' ')}
+    >
       {etapa === 'pontos' && (
-        <header className="topo">
+        <header className="topo" key={`topo-${etapa}`}>
           <button
             type="button"
             className="voltar"
             aria-label="Voltar para a abertura"
-            onClick={() => setEtapa('abertura')}
+            onClick={voltarParaAbertura}
           >
             ‹
           </button>
@@ -507,7 +571,7 @@ function App() {
         </header>
       )}
       {etapa === 'rota' && (
-        <header className="topo">
+        <header className="topo" key={`topo-${etapa}`}>
           <button
             type="button"
             className="voltar voltar-texto"
@@ -521,7 +585,7 @@ function App() {
         etapa === 'conferir' ||
         etapa === 'classes' ||
         etapa === 'raio') && (
-        <header className="topo">
+        <header className="topo" key={`topo-${etapa}`}>
           <span className="topo-titulo">
             {etapa === 'desenhar'
               ? 'Desenhar área proibida'
@@ -537,7 +601,7 @@ function App() {
         </header>
       )}
       {etapa === 'restricoes' && (
-        <header className="topo">
+        <header className="topo" key={`topo-${etapa}`}>
           <button
             type="button"
             className="voltar voltar-texto"
@@ -549,7 +613,11 @@ function App() {
         </header>
       )}
       {etapa === 'pontos' && (
-        <section className="campos" aria-label="Origem e destino">
+        <section
+          className="campos"
+          key={`campos-${etapa}`}
+          aria-label="Origem e destino"
+        >
           <CampoDeEndereco
             id="origem"
             rotulo="Origem"
@@ -574,7 +642,11 @@ function App() {
         </section>
       )}
       {etapa === 'raio' && raio && (
-        <section className="campos" aria-label="Centro do raio">
+        <section
+          className="campos"
+          key={`campos-${etapa}`}
+          aria-label="Centro do raio"
+        >
           <CampoDeEndereco
             id="centro"
             rotulo="Endereço do centro"
@@ -624,20 +696,27 @@ function App() {
             : undefined
         }
       />
+      {calculando && (
+        <div
+          className="progresso"
+          role="progressbar"
+          aria-label="Calculando a rota"
+        />
+      )}
       {etapa === 'abertura' && (
         <>
           <div className="marca">Contorno</div>
           <button
             type="button"
             className="botao-principal comecar"
-            onClick={() => setEtapa('pontos')}
+            onClick={comecar}
           >
             Começar
           </button>
         </>
       )}
       {(etapa === 'pontos' || etapa === 'rota') && (
-        <section className="base">
+        <section className="base" key={`base-${etapa}`}>
           {aviso && (
             <Aviso
               titulo={aviso.titulo}
@@ -707,7 +786,7 @@ function App() {
         </section>
       )}
       {etapa === 'desenhar' && (
-        <section className="base">
+        <section className="base" key={`base-${etapa}`}>
           <PainelDoDesenho
             vertices={estadoDoDesenho.vertices}
             conferindo={conferindo}
@@ -718,7 +797,7 @@ function App() {
         </section>
       )}
       {etapa === 'conferir' && conferencia && (
-        <section className="base">
+        <section className="base" key={`base-${etapa}`}>
           <PainelDaConferencia
             resposta={conferencia.resposta}
             nome={nome}
@@ -735,7 +814,7 @@ function App() {
         </section>
       )}
       {etapa === 'raio' && raio && (
-        <section className="base">
+        <section className="base" key={`base-${etapa}`}>
           <PainelDoRaio
             temCentro={raio.centro !== null}
             metros={raio.metros}
@@ -749,7 +828,7 @@ function App() {
         </section>
       )}
       {etapa === 'classes' && (
-        <section className="base">
+        <section className="base" key={`base-${etapa}`}>
           <PainelDasClasses
             niveis={rascunhoDeNiveis}
             calculando={calculando}
@@ -761,7 +840,7 @@ function App() {
         </section>
       )}
       {etapa === 'restricoes' && (
-        <section className="base">
+        <section className="base" key={`base-${etapa}`}>
           <ListaDeRestricoes
             areas={areas}
             apontadas={apontadas}
@@ -784,11 +863,19 @@ function App() {
       )}
       {confirmandoCancelar && (
         <ConfirmarCancelar
-          aoContinuar={() => setConfirmandoCancelar(false)}
+          saindo={saindoDaJanela}
+          aoContinuar={fecharJanela}
           aoCancelar={cancelar}
         />
       )}
     </div>
+  )
+}
+
+function noComputador(): boolean {
+  return (
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia('(min-width: 900px)').matches
   )
 }
 
