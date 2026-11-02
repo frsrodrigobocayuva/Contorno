@@ -20,6 +20,7 @@ from datetime import datetime
 from typing import Any
 
 Linha = dict[str, Any]
+ESPERA_DE_VERDADE_MS = 10
 
 
 def requisicoes(texto: Iterable[str]) -> Iterator[Linha]:
@@ -113,7 +114,9 @@ def principal(texto: Iterable[str]) -> None:
     do_cache = [b for b in buscas if b["origem"] == "cache"]
     chamadas = [b for b in buscas if b["origem"] != "cache"]
     erros = [b for b in buscas if b["origem"] == "erro"]
-    esperas = [b["ms_espera"] for b in buscas if b["ms_espera"] > 0]
+    # Abaixo de 10 ms é só o custo de pegar a trava; esperar a vez (1 por segundo) leva centenas
+    # de milissegundos.
+    esperas = [b["ms_espera"] for b in buscas if b["ms_espera"] >= ESPERA_DE_VERDADE_MS]
     tempos = [b["ms_nominatim"] for b in chamadas if b["ms_nominatim"] is not None]
     print()
     print(f"    buscas por sessão:            {resumo(buscas_por_sessao)}")

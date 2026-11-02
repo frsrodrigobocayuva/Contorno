@@ -42,7 +42,7 @@ class Configuracao:
             tempo_maximo_motor_s=float(ambiente.get("ENGINE_TIMEOUT_S", "5")),
             nominatim_url=ambiente.get("NOMINATIM_URL", "https://nominatim.openstreetmap.org"),
             nominatim_user_agent=user_agent,
-            tempo_maximo_geocodificador_s=float(ambiente.get("GEOCODER_TIMEOUT_S", "10")),
+            tempo_maximo_geocodificador_s=float(ambiente.get("GEOCODER_TIMEOUT_S", "5")),
             cache_tamanho=int(ambiente.get("GEOCODER_CACHE_SIZE", "256")),
             cache_validade_s=float(ambiente.get("GEOCODER_CACHE_TTL_S", "3600")),
             retangulo=(retangulo[0], retangulo[1], retangulo[2], retangulo[3]),
