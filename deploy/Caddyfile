@@ -1,0 +1,21 @@
+# Caddy na frente do Contorno (ADR-015): HTTPS automático e a API pela rede interna do compose.
+{
+	# Só TCP: a VM não abre a 443 em UDP, então o HTTP/3 não é anunciado.
+	servers {
+		protocols h1 h2
+	}
+}
+
+{$DOMINIO} {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		# Os tiles da OSM pedem um Referer válido: vai só a origem do site.
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+
+	reverse_proxy api:8000
+}

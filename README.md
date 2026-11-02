@@ -103,12 +103,30 @@ O GitHub Actions (`.github/workflows/ci.yml`) roda a cada PR para a `main` e a c
 | `python` | Ruff, mypy, testes sem rede e cobertura mínima de 90% em domínio e aplicação |
 | `web` | Prettier, ESLint, TypeScript, Vitest e build |
 | `openapi` | se os tipos versionados do contrato estão atualizados |
-| `integracao` | sobe o compose com o GraphHopper e roda os testes de contrato |
+| `integracao` | confere o compose de produção e os scripts de deploy (ShellCheck), sobe o compose com o GraphHopper e roda os testes de contrato e os ponta a ponta |
 
 O CI nunca chama os serviços públicos da OSM: os hosts do Nominatim e dos tiles ficam bloqueados, e o serviço `falsos` (`compose.ci.yaml`) responde com as buscas gravadas em `tests/falsos/nominatim/` e um tile em branco. Para regravar as buscas (decisão explícita; usa o `NOMINATIM_USER_AGENT` do `.env`):
 
 ```bash
 python tests/falsos/gravar_nominatim.py
+```
+
+## Produção
+
+O Contorno público roda numa VM grátis da Oracle Cloud (ARM, Ubuntu 24.04), com o mesmo compose e uma camada a mais, `compose.prod.yaml`: o Caddy na frente, com HTTPS automático (Let's Encrypt) nas portas 80 e 443; a API sem porta publicada; o motor só na rede interna. O nome é um subdomínio do DuckDNS.
+
+| Arquivo | Para quê |
+|---|---|
+| `deploy/instalar.sh` | prepara a VM uma vez: firewall, swap, Docker, usuário `deploy`, `.env` de produção, DuckDNS |
+| `deploy/atualizar.sh` | instalado como `contorno-atualizar`: põe a VM numa tag e sobe o compose de produção |
+| `deploy/Caddyfile` | HTTPS e repasse para a API |
+| `.github/workflows/deploy.yml` | a cada Release publicada, entra na VM por SSH e atualiza; confere o `/health` público |
+
+A chave do workflow só consegue rodar o `contorno-atualizar` na VM. Para atualizar à mão, na VM: `sudo -u deploy contorno-atualizar vX.Y.Z`. Para testar o stack de produção na máquina local, com certificado de teste do Caddy:
+
+```bash
+DOMINIO=localhost docker compose -f compose.yaml -f compose.prod.yaml up -d --build --wait
+curl -k https://localhost/health
 ```
 
 ## Dados do mapa
@@ -128,6 +146,7 @@ Os dados são © OpenStreetMap contributors, sob a licença ODbL.
 app/        servidor, uma pasta por camada (api, aplicacao, dominio, infra)
 web/        cliente React
 motor/      GraphHopper: Dockerfile, config.yml e recorte do extrato
+deploy/     produção: Caddyfile e scripts da VM
 tests/      dominio, aplicacao, contrato, arquitetura; falsos da OSM para o CI
 ```
 
