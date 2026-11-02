@@ -15,6 +15,7 @@ import {
 } from './api/cliente'
 import { Aviso } from './Aviso'
 import { ConfirmarCancelar } from './ConfirmarCancelar'
+import { DURACAO, movimentoReduzido } from './movimento'
 import { PainelDaRota } from './comparacao/PainelDaRota'
 import {
   PainelDoDiagnostico,
@@ -178,6 +179,7 @@ function App() {
   const [conferencia, setConferencia] = useState<Conferencia | null>(null)
   const [raio, setRaio] = useState<RascunhoDoRaio | null>(null)
   const [confirmandoCancelar, setConfirmandoCancelar] = useState(false)
+  const [saindoDaJanela, setSaindoDaJanela] = useState(false)
   const [nome, setNome] = useState('')
   const [aviso, setAviso] = useState<AvisoDaRota | null>(null)
   const [diagnostico, setDiagnostico] = useState<DiagnosticoDasAreas | null>(
@@ -202,6 +204,7 @@ function App() {
     setConferencia(null)
     setRaio(null)
     setConfirmandoCancelar(false)
+    setSaindoDaJanela(false)
     setAviso(null)
     setDiagnostico(null)
     setCalculando(false)
@@ -226,6 +229,19 @@ function App() {
     else cancelar()
   }, [temRota, cancelar])
 
+  // A janela sai com fade (P8); com movimento reduzido, fecha na hora.
+  const fecharJanela = useCallback(() => {
+    if (movimentoReduzido()) {
+      setConfirmandoCancelar(false)
+      return
+    }
+    setSaindoDaJanela(true)
+    setTimeout(() => {
+      setConfirmandoCancelar(false)
+      setSaindoDaJanela(false)
+    }, DURACAO.saida)
+  }, [])
+
   // O Esc desfaz um nível por vez: com a janela de confirmar aberta, fecha a janela; no desenho,
   // no raio e na conferência, desiste só da área; nas outras telas, pede para cancelar a rota;
   // com tudo vazio, volta para a abertura (teste do usuário, 2026-10-31).
@@ -236,7 +252,7 @@ function App() {
     if (etapa === 'abertura') return
     function aoTeclar(evento: KeyboardEvent) {
       if (evento.key !== 'Escape') return
-      if (confirmandoCancelar) setConfirmandoCancelar(false)
+      if (confirmandoCancelar) fecharJanela()
       else if (
         etapa === 'desenhar' ||
         etapa === 'conferir' ||
@@ -249,7 +265,14 @@ function App() {
     }
     window.addEventListener('keydown', aoTeclar)
     return () => window.removeEventListener('keydown', aoTeclar)
-  }, [etapa, vazio, confirmandoCancelar, pedirCancelar, sairDaArea])
+  }, [
+    etapa,
+    vazio,
+    confirmandoCancelar,
+    fecharJanela,
+    pedirCancelar,
+    sairDaArea,
+  ])
 
   function marcar(campo: Campo, ponto: Ponto) {
     if (campo === 'origem') {
@@ -291,10 +314,14 @@ function App() {
         [...paraRestricoes(comAreas), ...paraPreferencias(comNiveis)],
       )
       if (esta !== consulta.current) return
+      // A resposta leva para a tela da rota só quem ainda estava esperando por ela, em origem e
+      // destino. Quem foi para a lista de restrições, o desenho ou as classes enquanto calculava
+      // fica onde está, e a rota se atualiza no mapa (CI vermelho depois do PR #20).
+      const paraARota = (atual: Etapa) => (atual === 'pontos' ? 'rota' : atual)
       if (resposta.tipo === 'ROTAS') {
         setRota(resposta.irrestrita)
         setRestrita(resposta.restrita ?? null)
-        setEtapa('rota')
+        setEtapa(paraARota)
       } else if (resposta.causa === 'DESTINO_INALCANCAVEL') {
         setAviso({
           titulo: 'Não existe caminho até este destino',
@@ -307,7 +334,7 @@ function App() {
           causa: resposta.causa,
           candidatas: resposta.candidatas,
         })
-        setEtapa('rota')
+        setEtapa(paraARota)
       }
     } catch (erro) {
       if (esta === consulta.current) setAviso(avisoDoErro(erro, comAreas))
@@ -494,7 +521,7 @@ function App() {
   return (
     <div className={etapa === 'abertura' ? 'app app-abertura' : 'app'}>
       {etapa === 'pontos' && (
-        <header className="topo">
+        <header className="topo" key={`topo-${etapa}`}>
           <button
             type="button"
             className="voltar"
@@ -507,7 +534,7 @@ function App() {
         </header>
       )}
       {etapa === 'rota' && (
-        <header className="topo">
+        <header className="topo" key={`topo-${etapa}`}>
           <button
             type="button"
             className="voltar voltar-texto"
@@ -521,7 +548,7 @@ function App() {
         etapa === 'conferir' ||
         etapa === 'classes' ||
         etapa === 'raio') && (
-        <header className="topo">
+        <header className="topo" key={`topo-${etapa}`}>
           <span className="topo-titulo">
             {etapa === 'desenhar'
               ? 'Desenhar área proibida'
@@ -537,7 +564,7 @@ function App() {
         </header>
       )}
       {etapa === 'restricoes' && (
-        <header className="topo">
+        <header className="topo" key={`topo-${etapa}`}>
           <button
             type="button"
             className="voltar voltar-texto"
@@ -549,7 +576,11 @@ function App() {
         </header>
       )}
       {etapa === 'pontos' && (
-        <section className="campos" aria-label="Origem e destino">
+        <section
+          className="campos"
+          key={`campos-${etapa}`}
+          aria-label="Origem e destino"
+        >
           <CampoDeEndereco
             id="origem"
             rotulo="Origem"
@@ -574,7 +605,11 @@ function App() {
         </section>
       )}
       {etapa === 'raio' && raio && (
-        <section className="campos" aria-label="Centro do raio">
+        <section
+          className="campos"
+          key={`campos-${etapa}`}
+          aria-label="Centro do raio"
+        >
           <CampoDeEndereco
             id="centro"
             rotulo="Endereço do centro"
@@ -624,6 +659,13 @@ function App() {
             : undefined
         }
       />
+      {calculando && (
+        <div
+          className="progresso"
+          role="progressbar"
+          aria-label="Calculando a rota"
+        />
+      )}
       {etapa === 'abertura' && (
         <>
           <div className="marca">Contorno</div>
@@ -637,7 +679,7 @@ function App() {
         </>
       )}
       {(etapa === 'pontos' || etapa === 'rota') && (
-        <section className="base">
+        <section className="base" key={`base-${etapa}`}>
           {aviso && (
             <Aviso
               titulo={aviso.titulo}
@@ -707,7 +749,7 @@ function App() {
         </section>
       )}
       {etapa === 'desenhar' && (
-        <section className="base">
+        <section className="base" key={`base-${etapa}`}>
           <PainelDoDesenho
             vertices={estadoDoDesenho.vertices}
             conferindo={conferindo}
@@ -718,7 +760,7 @@ function App() {
         </section>
       )}
       {etapa === 'conferir' && conferencia && (
-        <section className="base">
+        <section className="base" key={`base-${etapa}`}>
           <PainelDaConferencia
             resposta={conferencia.resposta}
             nome={nome}
@@ -735,7 +777,7 @@ function App() {
         </section>
       )}
       {etapa === 'raio' && raio && (
-        <section className="base">
+        <section className="base" key={`base-${etapa}`}>
           <PainelDoRaio
             temCentro={raio.centro !== null}
             metros={raio.metros}
@@ -749,7 +791,7 @@ function App() {
         </section>
       )}
       {etapa === 'classes' && (
-        <section className="base">
+        <section className="base" key={`base-${etapa}`}>
           <PainelDasClasses
             niveis={rascunhoDeNiveis}
             calculando={calculando}
@@ -761,7 +803,7 @@ function App() {
         </section>
       )}
       {etapa === 'restricoes' && (
-        <section className="base">
+        <section className="base" key={`base-${etapa}`}>
           <ListaDeRestricoes
             areas={areas}
             apontadas={apontadas}
@@ -784,7 +826,8 @@ function App() {
       )}
       {confirmandoCancelar && (
         <ConfirmarCancelar
-          aoContinuar={() => setConfirmandoCancelar(false)}
+          saindo={saindoDaJanela}
+          aoContinuar={fecharJanela}
           aoCancelar={cancelar}
         />
       )}

@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import type { Rota } from '../api/cliente'
 import { formatarCusto, formatarDistancia, formatarDuracao } from '../formato'
+import { useContagem } from '../movimento'
 
 interface Props {
   rota: Rota
@@ -61,6 +62,16 @@ function AplicarRestricoes({
   )
 }
 
+// O custo conta de zero até o valor quando aparece (R2).
+function Custo({ segundos, metros }: { segundos: number; metros: number }) {
+  const parte = useContagem(1)
+  return (
+    <span className="valor valor-custo">
+      {formatarCusto(segundos * parte, metros * parte)}
+    </span>
+  )
+}
+
 export function PainelDaRota({
   rota,
   restrita,
@@ -80,7 +91,7 @@ export function PainelDaRota({
             <span className="rotulo">Rota irrestrita</span>
             <span className="valor">{valores(rota)}</span>
           </div>
-          <span className="selo">
+          <span className="selo" key={quantasRestricoes}>
             {quantasRestricoes
               ? restricoes(quantasRestricoes)
               : 'nenhuma restrição'}
@@ -104,17 +115,26 @@ export function PainelDaRota({
     <div className="painel-rota">
       <div className="resumo-valores">
         <span className="rotulo">Custo da restrição</span>
-        <span className="valor valor-custo">
-          {formatarCusto(
-            restrita.duracaoSegundos - rota.duracaoSegundos,
-            restrita.distanciaMetros - rota.distanciaMetros,
-          )}
+        <Custo
+          key={`${restrita.duracaoSegundos}:${restrita.distanciaMetros}`}
+          segundos={restrita.duracaoSegundos - rota.duracaoSegundos}
+          metros={restrita.distanciaMetros - rota.distanciaMetros}
+        />
+        <span className="dica pulsa" key={quantasRestricoes}>
+          {restricoes(quantasRestricoes)}
         </span>
-        <span className="dica">{restricoes(quantasRestricoes)}</span>
       </div>
       <ul className="legenda" aria-label="Legenda das rotas">
         <li>
-          <svg width="28" height="8" viewBox="0 0 28 8" aria-hidden="true">
+          <svg width="28" height="16" viewBox="0 -4 28 16" aria-hidden="true">
+            <path
+              className="brilho"
+              d="M2,4 L26,4"
+              stroke="#594927"
+              strokeWidth="12"
+              strokeOpacity="0.35"
+              strokeLinecap="round"
+            />
             <path
               d="M2,4 L26,4"
               stroke="#594927"

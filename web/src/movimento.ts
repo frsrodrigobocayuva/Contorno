@@ -1,0 +1,108 @@
+// Movimento (vault, Contorno-Animacoes; pedido do usuário, 2026-11-02): as durações, o respeito ao
+// movimento reduzido do sistema e as peças das animações feitas em código (as de CSS ficam no
+// index.css). Com movimento reduzido, tudo vai direto ao estado final.
+import { useEffect, useState } from 'react'
+import type { Coordenadas } from './api/cliente'
+
+export const DURACAO = {
+  // Quanto a janela de cancelar e os itens removidos levam para sair (P6, P8).
+  saida: 200,
+  // A câmera deslizando até a rota (M4).
+  camera: 500,
+  // A rota sendo desenhada de A até B (M3).
+  rota: 600,
+  // Áreas e nomes entrando e saindo do mapa (M5, M9).
+  area: 300,
+  // O pulso do vermelho das áreas apontadas (M6).
+  pulso: 700,
+  // Os números do custo contando até o valor (R2).
+  contagem: 400,
+  // Um ciclo do brilho da rota restrita (M1).
+  brilho: 2500,
+}
+
+export function movimentoReduzido(): boolean {
+  return (
+    typeof window.matchMedia !== 'function' ||
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  )
+}
+
+// Chama `aoQuadro` com o progresso de 0 a 1 (desacelerando no fim) e `aoTerminar` no fim. Devolve
+// como concluir antes da hora: salta para o fim, para nada ficar pela metade quando chega uma
+// mudança nova. Com movimento reduzido, vai direto ao fim.
+export function animar(
+  duracaoMs: number,
+  aoQuadro: (progresso: number) => void,
+  aoTerminar?: () => void,
+): () => void {
+  let terminou = false
+  const terminar = () => {
+    if (terminou) return
+    terminou = true
+    aoQuadro(1)
+    aoTerminar?.()
+  }
+  if (movimentoReduzido()) {
+    terminar()
+    return () => {}
+  }
+  const inicio = performance.now()
+  let quadro = 0
+  const passo = (agora: number) => {
+    if (terminou) return
+    const t = Math.min(1, (agora - inicio) / duracaoMs)
+    if (t >= 1) {
+      terminar()
+      return
+    }
+    aoQuadro(1 - (1 - t) ** 3)
+    quadro = requestAnimationFrame(passo)
+  }
+  quadro = requestAnimationFrame(passo)
+  return () => {
+    cancelAnimationFrame(quadro)
+    terminar()
+  }
+}
+
+// O começo da linha até a fração pedida do comprimento (M3). As distâncias são planas, com a
+// longitude encurtada pela latitude: para desenhar, basta.
+export function trechoAte(
+  coordenadas: Coordenadas[],
+  fracao: number,
+): Coordenadas[] {
+  if (fracao >= 1 || coordenadas.length < 2) return coordenadas
+  const encurta = Math.cos((coordenadas[0][1] * Math.PI) / 180)
+  const trechos = coordenadas.slice(1).map((c, i) => {
+    const [x0, y0] = coordenadas[i]
+    return Math.hypot((c[0] - x0) * encurta, c[1] - y0)
+  })
+  let falta = trechos.reduce((a, b) => a + b, 0) * Math.max(0, fracao)
+  const saida: Coordenadas[] = [coordenadas[0]]
+  for (let i = 0; i < trechos.length; i++) {
+    const [x0, y0] = coordenadas[i]
+    const [x1, y1] = coordenadas[i + 1]
+    if (falta >= trechos[i]) {
+      saida.push(coordenadas[i + 1])
+      falta -= trechos[i]
+      if (falta <= 1e-12) break
+      continue
+    }
+    const parte = trechos[i] > 0 ? falta / trechos[i] : 0
+    saida.push([x0 + (x1 - x0) * parte, y0 + (y1 - y0) * parte])
+    break
+  }
+  return saida
+}
+
+// Um número que conta de 0 até o alvo quando o alvo muda (R2). Com movimento reduzido, é o alvo.
+export function useContagem(alvo: number): number {
+  const [valor, setValor] = useState(0)
+  const reduzido = movimentoReduzido()
+  useEffect(() => {
+    if (reduzido) return
+    return animar(DURACAO.contagem, (p) => setValor(alvo * p))
+  }, [alvo, reduzido])
+  return reduzido ? alvo : valor
+}

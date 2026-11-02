@@ -3,11 +3,17 @@
 import { useEffect, useRef } from 'react'
 
 interface Props {
+  // Saindo: a janela some com fade antes de fechar (P8).
+  saindo?: boolean
   aoContinuar: () => void
   aoCancelar: () => void
 }
 
-export function ConfirmarCancelar({ aoContinuar, aoCancelar }: Props) {
+export function ConfirmarCancelar({
+  saindo = false,
+  aoContinuar,
+  aoCancelar,
+}: Props) {
   const continuar = useRef<HTMLButtonElement>(null)
 
   // O foco vai para a opção que não perde nada; o Esc fecha a janela (App).
@@ -17,7 +23,7 @@ export function ConfirmarCancelar({ aoContinuar, aoCancelar }: Props) {
 
   return (
     <div
-      className="fundo-escuro"
+      className={saindo ? 'fundo-escuro saindo' : 'fundo-escuro'}
       onClick={(evento) => {
         if (evento.target === evento.currentTarget) aoContinuar()
       }}

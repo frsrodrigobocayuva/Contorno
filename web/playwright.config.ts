@@ -12,6 +12,8 @@ export default defineConfig({
   reporter: process.env.CI ? 'list' : 'line',
   use: {
     baseURL: process.env.BASE_URL ?? 'http://localhost:8000',
+    // Sem animações (Contorno-Animacoes): as capturas por pixel e as posições ficam estáveis.
+    reducedMotion: 'reduce',
     trace: 'retain-on-failure',
   },
   projects: [

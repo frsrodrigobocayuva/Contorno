@@ -226,6 +226,22 @@ input {
   cursor: pointer;
 }
 
+/* Botões (R4): a cor muda com transição, e o botão afunda um pouco ao ser apertado. O `scale`
+   separado não briga com o `transform` de quem já usa um (o Começar, centralizado). */
+.botao,
+.botao-principal {
+  transition:
+    background-color 150ms ease-out,
+    color 150ms ease-out,
+    border-color 150ms ease-out,
+    scale 100ms ease-out;
+}
+
+.botao:active:not(:disabled),
+.botao-principal:active:not(:disabled) {
+  scale: 0.97;
+}
+
 .botao:disabled {
   cursor: default;
   border-color: var(--borda-forte);
@@ -359,9 +375,16 @@ input {
   font-size: 16px;
 }
 
+/* O MapLibre posiciona o elemento de fora; o corpo, dentro dele, é o desenho e cai no lugar (M7). */
 .marcador {
   width: 26px;
   height: 26px;
+}
+
+.marcador-corpo {
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
   border-radius: 50%;
   background: var(--tinta);
   color: #ffffff;
@@ -371,6 +394,7 @@ input {
   font-size: 13px;
   font-weight: 600;
   border: 2px solid #ffffff;
+  animation: cair 260ms ease-out;
 }
 
 /* Título e ação do topo no desenho, na conferência e nas restrições (telas 04, 05 e 07). */
@@ -586,11 +610,36 @@ input {
 }
 
 .segmentado {
+  position: relative;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   border: 1.5px solid var(--tinta);
   border-radius: 4px;
   overflow: hidden;
+}
+
+/* O destaque da opção marcada desliza até ela (P9). */
+.segmentado::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: calc(100% / 3);
+  background: var(--tinta);
+  transition: translate 200ms ease-out;
+}
+
+.segmentado:has(label:nth-child(2) input:checked)::before {
+  translate: 100% 0;
+}
+
+.segmentado:has(label:nth-child(3) input:checked)::before {
+  translate: 200% 0;
+}
+
+.segmentado:not(:has(input:checked))::before {
+  display: none;
 }
 
 .segmentado label {
@@ -621,8 +670,12 @@ input {
   font-weight: 600;
 }
 
+.segmentado label {
+  z-index: 1;
+  transition: color 200ms ease-out;
+}
+
 .segmentado label:has(input:checked) {
-  background: var(--tinta);
   color: #ffffff;
 }
 
@@ -635,9 +688,6 @@ input {
 .marcador-centro {
   width: 14px;
   height: 14px;
-  border-radius: 50%;
-  background: var(--tinta);
-  border: 2px solid #ffffff;
 }
 
 /* Distância do raio (tela 08): o rótulo com o valor à direita e o controle deslizante. */
@@ -693,4 +743,192 @@ input[type='range'] {
   margin: 0;
   font-size: 14px;
   line-height: 1.45;
+}
+
+/* Movimento (vault, Contorno-Animacoes; pedido do usuário, 2026-11-02). Interface de 150 a
+   250 ms; nada impede o próximo toque. */
+@keyframes entrar {
+  from {
+    opacity: 0;
+    translate: 0 8px;
+  }
+}
+
+@keyframes aparecer {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes sumir {
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes cair {
+  from {
+    opacity: 0;
+    translate: 0 -14px;
+    scale: 0.9;
+  }
+}
+
+@keyframes crescer {
+  from {
+    opacity: 0;
+    scale: 0.96;
+  }
+}
+
+@keyframes pulsar {
+  50% {
+    scale: 1.06;
+  }
+}
+
+@keyframes encolher {
+  to {
+    opacity: 0;
+    max-height: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    margin-bottom: -10px;
+  }
+}
+
+@keyframes brilho-legenda {
+  0%,
+  100% {
+    stroke-opacity: 0.15;
+  }
+  50% {
+    stroke-opacity: 0.5;
+  }
+}
+
+@keyframes progresso {
+  from {
+    translate: -100% 0;
+  }
+  to {
+    translate: 300% 0;
+  }
+}
+
+/* P1: cada tela nova entra no painel com fade e um deslize leve; o topo, só com fade. */
+.base,
+.campos {
+  animation: entrar 200ms ease-out;
+}
+
+.topo {
+  animation: aparecer 200ms ease-out;
+}
+
+/* P2: a abertura. P3: avisos. P5: as opções de restrição. P7: a etiqueta. M8: o nome da área. */
+.marca,
+.comecar,
+.etiqueta,
+.rotulo-da-area {
+  animation: aparecer 250ms ease-out;
+}
+
+.aviso,
+.restricoes {
+  animation: entrar 200ms ease-out;
+}
+
+/* P4: os resultados da busca entram um depois do outro. */
+.resultados li {
+  animation: entrar 200ms ease-out both;
+}
+
+.resultados li:nth-child(2) {
+  animation-delay: 30ms;
+}
+
+.resultados li:nth-child(3) {
+  animation-delay: 60ms;
+}
+
+.resultados li:nth-child(4) {
+  animation-delay: 90ms;
+}
+
+.resultados li:nth-child(5) {
+  animation-delay: 120ms;
+}
+
+/* P6: a área removida encolhe e some. */
+.quadro.saindo {
+  overflow: hidden;
+  max-height: 240px;
+  animation: encolher 200ms ease-in forwards;
+}
+
+/* P8: a janela de cancelar. */
+.fundo-escuro {
+  animation: aparecer 200ms ease-out;
+}
+
+.janela {
+  animation: crescer 200ms ease-out;
+}
+
+.fundo-escuro.saindo {
+  animation: sumir 200ms ease-in forwards;
+}
+
+/* R3: o número de restrições pulsa quando muda. */
+.selo,
+.pulsa {
+  animation: pulsar 400ms ease-out;
+}
+
+/* M1 na legenda: o brilho da rota restrita pulsa como no mapa. */
+.legenda .brilho {
+  animation: brilho-legenda 2.5s ease-in-out infinite;
+}
+
+/* R1: barra fina no alto do mapa enquanto a rota é calculada. */
+.progresso {
+  grid-area: mapa;
+  align-self: start;
+  z-index: 3;
+  height: 3px;
+  overflow: hidden;
+  pointer-events: none;
+  background: rgba(89, 73, 39, 0.25);
+}
+
+.progresso::after {
+  content: '';
+  display: block;
+  width: 33%;
+  height: 100%;
+  background: #594927;
+  animation: progresso 1.1s ease-in-out infinite;
+}
+
+/* Movimento reduzido no sistema: as animações viram troca instantânea, e o brilho fica parado. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    animation-delay: 0ms !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .legenda .brilho {
+    animation: none !important;
+  }
+
+  .progresso::after {
+    animation: none !important;
+    width: 100%;
+    opacity: 0.6;
+  }
 }

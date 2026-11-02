@@ -582,6 +582,40 @@ describe('App', () => {
       ])
     })
 
+    it('quem abre a lista enquanto calcula continua nela quando a rota chega', async () => {
+      // CI vermelho depois do PR #20: a resposta tirava o usuário da lista de restrições.
+      let responder: (resposta: Response) => void = () => {}
+      await ateODesenho([
+        [/^\/restricoes\/area$/, () => json(AREA)],
+        [
+          /^\/rotas\/calculo$/,
+          (opcoes) => {
+            if (!corpo(opcoes).restricoes?.length) return json(ROTA)
+            return new Promise<Response>((resolver) => {
+              responder = resolver
+            }) as unknown as Response
+          },
+        ],
+      ])
+      fireEvent.click(screen.getByRole('button', { name: 'Concluir área' }))
+      fireEvent.click(
+        await screen.findByRole('button', { name: 'Confirmar e recalcular' }),
+      )
+      expect(
+        screen.getByRole('progressbar', { name: 'Calculando a rota' }),
+      ).toBeInTheDocument()
+
+      fireEvent.click(screen.getByRole('button', { name: /Ver restrições/ }))
+      await act(async () => {
+        responder(json(RESTRITA))
+      })
+
+      expect(screen.getByText('Áreas proibidas (1)')).toBeInTheDocument()
+      expect(screen.queryByRole('progressbar')).not.toBeInTheDocument()
+      fireEvent.click(screen.getByRole('button', { name: '‹ Rota' }))
+      expect(screen.getByText('Custo da restrição')).toBeInTheDocument()
+    })
+
     it('área que cobre o destino avisa e volta ao desenho para ajustar', async () => {
       await ateODesenho([
         [
