@@ -1,0 +1,60 @@
+# Deploy (ADR-015): a cada Release publicada, a VM da Oracle Cloud passa para a tag dela.
+# Também dá para disparar à mão, com uma tag já publicada.
+# Secrets: DEPLOY_HOST (IP da VM), DEPLOY_SSH_KEY (chave privada do usuário deploy, que só
+# roda o contorno-atualizar), DEPLOY_KNOWN_HOSTS (chave do host da VM). Variável: DOMINIO.
+name: Deploy
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      versao:
+        description: "Tag publicada (vX.Y.Z)"
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    environment:
+      name: producao
+      url: https://${{ vars.DOMINIO }}
+    env:
+      VERSAO: ${{ github.event.release.tag_name || inputs.versao }}
+      DOMINIO: ${{ vars.DOMINIO }}
+    steps:
+      - name: Versão
+        run: |
+          if [[ ! "$VERSAO" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Versão inválida: '$VERSAO' (use uma tag vX.Y.Z)"
+            exit 1
+          fi
+      - name: Chave e host conferido
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy
+          chmod 600 ~/.ssh/deploy
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+      # A chave só roda o contorno-atualizar na VM; o argumento é a versão.
+      - name: Atualizar a VM
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+        run: |
+          ssh -i ~/.ssh/deploy -o BatchMode=yes -o StrictHostKeyChecking=yes \
+            -o ServerAliveInterval=30 "deploy@$DEPLOY_HOST" "$VERSAO"
+      - name: Conferir o endereço público
+        run: |
+          curl -fsS --retry 10 --retry-delay 6 --retry-all-errors "https://$DOMINIO/health"
+          echo
+          curl -fsS -o /dev/null -w "página inicial: %{http_code}\n" "https://$DOMINIO/"

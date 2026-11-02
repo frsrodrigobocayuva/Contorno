@@ -1,0 +1,46 @@
+# Produção (ADR-015), aplicado por cima do compose.yaml na VM da Oracle Cloud:
+#   docker compose -f compose.yaml -f compose.prod.yaml up -d --build
+# - o Caddy fica na frente, com HTTPS automático (Let's Encrypt) nas portas 80 e 443;
+# - a API deixa de publicar a 8000: só o Caddy a alcança, pela rede interna;
+# - o motor continua só na rede interna, como no Diagrama de Implantação;
+# - tudo volta sozinho depois de um reboot, e os logs têm tamanho máximo.
+# O DOMINIO vem do .env da VM, junto com o contato do Nominatim.
+
+x-logs: &logs
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  graphhopper:
+    restart: unless-stopped
+    logging: *logs
+
+  api:
+    ports: !reset []
+    restart: unless-stopped
+    logging: *logs
+
+  caddy:
+    image: caddy:2.11.7-alpine
+    restart: unless-stopped
+    environment:
+      DOMINIO: ${DOMINIO:?defina DOMINIO no .env (o endereço público, ex. contorno.duckdns.org)}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      # Certificados e chaves do Let's Encrypt: sobrevivem às atualizações.
+      - caddy-dados:/data
+      - caddy-config:/config
+    depends_on:
+      api:
+        condition: service_healthy
+    networks: [contorno-net]
+    logging: *logs
+
+volumes:
+  caddy-dados:
+  caddy-config:

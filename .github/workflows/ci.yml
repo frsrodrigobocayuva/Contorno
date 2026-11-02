@@ -110,6 +110,11 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Bloquear os serviços públicos da OSM
         run: bash .github/scripts/bloquear-osm.sh
+      # Produção (ADR-015): o compose de produção monta e os scripts da VM passam no ShellCheck.
+      - name: Compose de produção e scripts de deploy
+        run: |
+          DOMINIO=exemplo.duckdns.org docker compose -f compose.yaml -f compose.prod.yaml config --quiet
+          shellcheck deploy/*.sh
       - name: Pasta do grafo no runner
         run: |
           mkdir -p "$RUNNER_TEMP/graph-cache"
