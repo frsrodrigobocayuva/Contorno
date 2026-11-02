@@ -11,13 +11,20 @@ import {
   Marker,
   NavigationControl,
   setWorkerUrl,
+  type ExpressionSpecification,
   type GeoJSONSource,
   type MapOptions,
 } from 'maplibre-gl'
 import enderecoDoWorker from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url'
 import { useEffect, useImperativeHandle, useRef, type Ref } from 'react'
 import type { Contorno, Coordenadas } from '../api/cliente'
-import { animar, DURACAO, movimentoReduzido, trechoAte } from '../movimento'
+import {
+  animar,
+  degradeDaVarredura,
+  DURACAO,
+  movimentoReduzido,
+  trechoAte,
+} from '../movimento'
 import {
   EditorDeArea,
   type EstadoDoDesenho,
@@ -62,6 +69,16 @@ const VAZIO = { type: 'FeatureCollection' as const, features: [] }
 
 // O brilho da restrita parado: com movimento reduzido, e o ponto de partida do pulso (M1).
 const BRILHO = { largura: 14, opacidade: 0.35 }
+
+// A varredura clara na posição pedida da linha (M1b); 2 deixa a linha sem traço.
+function varredura(posicao: number): ExpressionSpecification {
+  return [
+    'interpolate',
+    ['linear'],
+    ['line-progress'],
+    ...degradeDaVarredura(posicao),
+  ] as unknown as ExpressionSpecification
+}
 
 // Área apontada pelo diagnóstico, em vermelho (teste do usuário, 2026-11-01; canvas v27): 4,7:1
 // sobre o fundo areia do mapa. As outras áreas seguem em preto.
@@ -302,9 +319,11 @@ export function Mapa({ ref, ...props }: Props) {
         data: linha(p.referencia),
       })
       novo.addSource('rota', { type: 'geojson', data: linha(p.rota) })
+      // `lineMetrics` dá o `line-progress` que a varredura usa para correr de A a B.
       novo.addSource('rota-restrita', {
         type: 'geojson',
         data: linha(p.rotaRestrita),
+        lineMetrics: true,
       })
       novo.addLayer({
         id: 'areas-hachura',
@@ -386,6 +405,18 @@ export function Mapa({ ref, ...props }: Props) {
         paint: {
           'line-color': '#594927',
           'line-width': 5,
+          'line-opacity-transition': { duration: 0 },
+        },
+      })
+      // Por cima da restrita, o traço claro que corre de A a B, como se ela carregasse (M1b).
+      novo.addLayer({
+        id: 'rota-restrita-varredura',
+        type: 'line',
+        source: 'rota-restrita',
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: {
+          'line-width': 5,
+          'line-gradient': varredura(2),
           'line-opacity-transition': { duration: 0 },
         },
       })
@@ -490,6 +521,7 @@ export function Mapa({ ref, ...props }: Props) {
       [
         ['rota-restrita', 1],
         ['rota-restrita-brilho', BRILHO.opacidade],
+        ['rota-restrita-varredura', 1],
       ],
       rotaRestrita,
       novaRestrita,
@@ -497,17 +529,34 @@ export function Mapa({ ref, ...props }: Props) {
     if (novaRota || novaRestrita) enquadrar(atual, [rota, rotaRestrita])
   }, [rota, rotaRestrita])
 
-  // O brilho da restrita pulsa enquanto ela está no mapa (M1), a uns 20 quadros por segundo. Com
-  // movimento reduzido, fica parado.
+  // O brilho da restrita pulsa enquanto ela está no mapa (M1), e um traço claro corre de A a B a
+  // cada 3 s, começando depois que a linha termina de ser desenhada (M1b), a uns 30 quadros por
+  // segundo. Com movimento reduzido, o brilho fica parado e não há traço.
   useEffect(() => {
     const atual = mapa.current
     if (!atual || !rotaRestrita || movimentoReduzido()) return
     const inicio = performance.now()
     let ultimo = 0
+    let ultimaPosicao = 2
     let quadro = 0
     const passo = (agora: number) => {
-      if (agora - ultimo >= 50 && atual.getLayer('rota-restrita-brilho')) {
+      if (agora - ultimo >= 33 && atual.getLayer('rota-restrita-brilho')) {
         ultimo = agora
+        const desdeODesenho = agora - inicio - DURACAO.rota
+        const fase =
+          desdeODesenho < 0 ? -1 : desdeODesenho % DURACAO.cicloDaVarredura
+        const posicao =
+          fase >= 0 && fase < DURACAO.varredura
+            ? -0.08 + 1.16 * (fase / DURACAO.varredura)
+            : 2
+        if (posicao !== 2 || ultimaPosicao !== 2) {
+          atual.setPaintProperty(
+            'rota-restrita-varredura',
+            'line-gradient',
+            varredura(posicao),
+          )
+          ultimaPosicao = posicao
+        }
         const onda =
           (1 - Math.cos((2 * Math.PI * (agora - inicio)) / DURACAO.brilho)) / 2
         atual.setPaintProperty(

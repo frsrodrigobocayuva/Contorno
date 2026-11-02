@@ -19,6 +19,39 @@ export const DURACAO = {
   contagem: 400,
   // Um ciclo do brilho da rota restrita (M1).
   brilho: 2500,
+  // O traço claro que corre pela restrita de A a B (M1b), e de quanto em quanto tempo ele volta.
+  varredura: 900,
+  cicloDaVarredura: 3000,
+}
+
+// O traço claro da varredura (M1b; pedido do usuário, 2026-11-02): um branco quente, para não
+// destoar do fundo areia.
+const CLARO = 'rgba(255, 248, 230, 0.9)'
+const SEM_COR = 'rgba(255, 248, 230, 0)'
+
+// As paradas do degradê da varredura ao longo da linha (`line-progress`, de 0 a 1): sem cor, claro
+// em `posicao` e sem cor de novo, numa faixa de `largura`. Fora de 0 a 1, a linha fica sem traço.
+// As paradas saem em ordem crescente e sem repetir, como o MapLibre exige.
+export function degradeDaVarredura(
+  posicao: number,
+  largura = 0.08,
+): (number | string)[] {
+  const pontos: [number, string][] = [
+    [0, SEM_COR],
+    [posicao - largura, SEM_COR],
+    [posicao, CLARO],
+    [posicao + largura, SEM_COR],
+    [1, SEM_COR],
+  ]
+  const saida: (number | string)[] = []
+  let anterior = -1
+  for (const [lugar, cor] of pontos) {
+    const dentro = Math.min(1, Math.max(0, lugar))
+    if (dentro <= anterior) continue
+    saida.push(dentro, cor)
+    anterior = dentro
+  }
+  return saida
 }
 
 export function movimentoReduzido(): boolean {

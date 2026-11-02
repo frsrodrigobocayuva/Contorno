@@ -398,11 +398,16 @@ describe('Mapa', () => {
     mapa.disparar('load')
 
     const ids = mapa.camadas.map((c) => c.id)
-    expect(ids.slice(-3)).toEqual([
+    expect(ids.slice(-4)).toEqual([
       'rota-irrestrita',
       'rota-restrita-brilho',
       'rota-restrita',
+      'rota-restrita-varredura',
     ])
+    expect(mapa.getLayer('rota-restrita-varredura')).toMatchObject({
+      source: 'rota-restrita',
+      paint: { 'line-width': 5 },
+    })
     expect(mapa.getLayer('rota-restrita-brilho')).toMatchObject({
       source: 'rota-restrita',
       paint: { 'line-blur': 6, 'line-opacity': 0.35 },

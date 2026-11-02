@@ -1,7 +1,13 @@
 import { renderHook } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import type { Coordenadas } from './api/cliente'
-import { animar, movimentoReduzido, trechoAte, useContagem } from './movimento'
+import {
+  animar,
+  degradeDaVarredura,
+  movimentoReduzido,
+  trechoAte,
+  useContagem,
+} from './movimento'
 
 // Uma linha reta de dois trechos iguais, na mesma latitude.
 const RETA: Coordenadas[] = [
@@ -34,6 +40,22 @@ describe('movimento', () => {
     expect(quarto[1][0]).toBeCloseTo(-51.15)
     expect(quarto[1][1]).toBeCloseTo(-29.7)
     expect(trechoAte(RETA, 0)).toEqual([RETA[0], RETA[0]])
+  })
+
+  it('a varredura é clara só na faixa da posição, com paradas em ordem', () => {
+    const meio = degradeDaVarredura(0.5)
+    expect(meio.filter((_, i) => i % 2 === 0)).toEqual([0, 0.42, 0.5, 0.58, 1])
+    expect(meio[5]).toContain('0.9')
+
+    // No começo e fora da linha, as paradas continuam crescentes e sem repetir.
+    for (const posicao of [-0.08, 0.02, 0.99, 2]) {
+      const lugares = degradeDaVarredura(posicao).filter((_, i) => i % 2 === 0)
+      expect(lugares[0]).toBe(0)
+      expect(lugares.at(-1)).toBe(1)
+      for (let i = 1; i < lugares.length; i++)
+        expect(lugares[i]).toBeGreaterThan(lugares[i - 1] as number)
+    }
+    expect(degradeDaVarredura(2)).not.toContain('rgba(255, 248, 230, 0.9)')
   })
 
   it('com movimento reduzido, a contagem já começa no valor', () => {
