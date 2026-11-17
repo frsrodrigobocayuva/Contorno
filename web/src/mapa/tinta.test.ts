@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { tabela, tingir } from './tinta'
+import { naPaleta, tabela } from './tinta'
 
 function cor(cores: Uint8ClampedArray, claridade: number) {
   return Array.from(cores.slice(claridade * 3, claridade * 3 + 3))
@@ -24,25 +24,16 @@ describe('tinta do mapa', () => {
     expect(cor(cores, 51)).toEqual([51, 0, 0])
   })
 
-  it('troca cada pixel pela cor da sua claridade e mantém a transparência', () => {
-    const pixels = new Uint8ClampedArray([
-      255, 255, 255, 255, 190, 190, 190, 128, 0, 0, 0, 0,
-    ])
-
-    tingir(pixels, tabela())
-
-    expect(Array.from(pixels)).toEqual([
-      0xed, 0xd8, 0xaf, 255, 0xbf, 0xaf, 0x8f, 128, 0x1f, 0x1a, 0x12, 0,
-    ])
+  it('troca cada cor pela cor da paleta na mesma claridade', () => {
+    expect(naPaleta('#FFFFFF')).toBe('#EDD8AF')
+    expect(naPaleta('#BEBEBE')).toBe('#BFAF8F')
+    expect(naPaleta('#000000')).toBe('#1F1A12')
   })
 
   it('a claridade pesa o verde mais que o vermelho e o azul', () => {
-    const verde = new Uint8ClampedArray([0, 255, 0, 255])
-    const azul = new Uint8ClampedArray([0, 0, 255, 255])
-
-    tingir(verde, tabela())
-    tingir(azul, tabela())
-
-    expect(verde[0]).toBeGreaterThan(azul[0])
+    expect(naPaleta('#00FF00')).not.toBe(naPaleta('#0000FF'))
+    expect(parseInt(naPaleta('#00FF00').slice(1, 3), 16)).toBeGreaterThan(
+      parseInt(naPaleta('#0000FF').slice(1, 3), 16),
+    )
   })
 })

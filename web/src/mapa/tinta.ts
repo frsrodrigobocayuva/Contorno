@@ -1,6 +1,7 @@
-// Paleta do mapa (plano, 2026-10-30): o branco dos tiles do OSM vira o fundo areia, as linhas
-// cinza viram #BFAF8F e o texto fica num marrom quase preto, legível sobre o fundo. Cada pixel é
-// trocado pela cor da paleta na mesma claridade; a rota é desenhada por cima e não passa por aqui.
+// Paleta do mapa (plano, 2026-10-30): o branco do mapa do OSM vira o fundo areia, as linhas
+// cinza viram #BFAF8F e o texto fica num marrom quase preto, legível sobre o fundo. Cada cor é
+// trocada pela cor da paleta na mesma claridade. Até a Sprint 5 isso era feito pixel a pixel nos
+// tiles raster; com o mapa vetorial (#107), é feito uma vez, nas cores do estilo (estilo.ts).
 
 type Parada = readonly [claridade: number, cor: string]
 
@@ -40,14 +41,12 @@ export function tabela(
   return cores
 }
 
-// Troca, no lugar, cada pixel RGBA pela cor da paleta na sua claridade; a transparência fica.
-export function tingir(pixels: Uint8ClampedArray, cores: Uint8ClampedArray) {
-  for (let i = 0; i < pixels.length; i += 4) {
-    const claridade = Math.round(
-      0.2126 * pixels[i] + 0.7152 * pixels[i + 1] + 0.0722 * pixels[i + 2],
-    )
-    pixels[i] = cores[claridade * 3]
-    pixels[i + 1] = cores[claridade * 3 + 1]
-    pixels[i + 2] = cores[claridade * 3 + 2]
-  }
+const CORES = tabela()
+
+// A cor da paleta na claridade da cor pedida (#RRGGBB), em maiúsculas.
+export function naPaleta(cor: string, cores: Uint8ClampedArray = CORES) {
+  const [r, g, b] = rgb(cor)
+  const claridade = Math.round(0.2126 * r + 0.7152 * g + 0.0722 * b)
+  const canais = Array.from(cores.slice(claridade * 3, claridade * 3 + 3))
+  return `#${canais.map((c) => c.toString(16).padStart(2, '0')).join('')}`.toUpperCase()
 }
