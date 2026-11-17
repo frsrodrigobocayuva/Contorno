@@ -105,7 +105,7 @@ O GitHub Actions (`.github/workflows/ci.yml`) roda a cada PR para a `main` e a c
 | `openapi` | se os tipos versionados do contrato estão atualizados |
 | `integracao` | sobe o compose com o GraphHopper e roda os testes de contrato |
 
-O CI nunca chama os serviços públicos da OSM: os hosts do Nominatim e dos tiles ficam bloqueados, e o serviço `falsos` (`compose.ci.yaml`) responde com as buscas gravadas em `tests/falsos/nominatim/` e um tile em branco. Para regravar as buscas (decisão explícita; usa o `NOMINATIM_USER_AGENT` do `.env`):
+O CI nunca chama os serviços públicos da OSM nem o OpenFreeMap, de onde vêm os tiles do mapa base vetorial (ADR-016): os hosts do Nominatim e dos tiles ficam bloqueados, e o serviço `falsos` (`compose.ci.yaml`) responde com as buscas gravadas em `tests/falsos/nominatim/`. Sem os tiles, o mapa fica só com o fundo do estilo, e os testes ponta a ponta conferem esse fundo e a atribuição. Para regravar as buscas (decisão explícita; usa o `NOMINATIM_USER_AGENT` do `.env`):
 
 ```bash
 python tests/falsos/gravar_nominatim.py

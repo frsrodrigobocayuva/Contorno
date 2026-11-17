@@ -55,7 +55,9 @@ def test_tile_em_branco() -> None:
     assert resposta.content.startswith(b"\x89PNG")
 
 
-@pytest.mark.parametrize("host", ["nominatim.openstreetmap.org", "tile.openstreetmap.org"])
+@pytest.mark.parametrize(
+    "host", ["nominatim.openstreetmap.org", "tile.openstreetmap.org", "tiles.openfreemap.org"]
+)
 def test_servicos_publicos_da_osm_bloqueados(host: str) -> None:
     enderecos = {info[4][0] for info in socket.getaddrinfo(host, 443)}
 

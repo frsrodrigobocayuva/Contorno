@@ -2,7 +2,8 @@
 #   COMPOSE_FILE=compose.yaml:compose.ci.yaml  e  GRAPH_CACHE_DIR=<pasta do grafo no runner>
 # - o grafo fica numa pasta do runner, que o cache do GitHub Actions consegue guardar;
 # - os falsos da OSM respondem no lugar do Nominatim e dos tiles (plano, A5);
-# - os hosts públicos da OSM apontam para lugar nenhum (mesma lista de .github/scripts/bloquear-osm.sh).
+# - os hosts públicos da OSM e o do OpenFreeMap apontam para lugar nenhum (mesma lista de
+#   .github/scripts/bloquear-osm.sh).
 
 x-sem-osm: &sem-osm
   - "nominatim.openstreetmap.org=0.0.0.0"
@@ -15,6 +16,8 @@ x-sem-osm: &sem-osm
   - "b.tile.openstreetmap.org=::"
   - "c.tile.openstreetmap.org=0.0.0.0"
   - "c.tile.openstreetmap.org=::"
+  - "tiles.openfreemap.org=0.0.0.0"
+  - "tiles.openfreemap.org=::"
 
 services:
   graphhopper:
