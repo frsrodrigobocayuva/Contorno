@@ -223,15 +223,27 @@ describe('Mapa', () => {
     expect(mapa.keyboard.disableRotation).toHaveBeenCalled()
   })
 
-  it('pede os tiles do OSM pelo protocolo que os recolore', () => {
+  it('usa o mapa base vetorial do OpenFreeMap, com a atribuição', () => {
     render(<Mapa />)
     const estilo = MapaFalso.ultimo.opcoes.style as {
-      sources: { osm: { tiles: string[] } }
+      sources: {
+        openmaptiles: { type: string; url: string; attribution: string }
+      }
     }
 
-    expect(estilo.sources.osm.tiles).toEqual([
-      'contorno-tinta://https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-    ])
+    expect(estilo.sources.openmaptiles).toMatchObject({
+      type: 'vector',
+      url: 'https://tiles.openfreemap.org/planet',
+    })
+    expect(estilo.sources.openmaptiles.attribution).toContain(
+      '© OpenStreetMap contributors',
+    )
+    // Sem os tiles (serviço fora do ar, ou o CI), a atribuição do OSM continua no mapa.
+    expect(MapaFalso.ultimo.opcoes.attributionControl).toMatchObject({
+      customAttribution: expect.stringContaining(
+        '© OpenStreetMap contributors',
+      ),
+    })
   })
 
   it('o duplo clique do mouse cancela e não dá zoom', () => {

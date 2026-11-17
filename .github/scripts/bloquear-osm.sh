@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# O CI nunca chama os serviços públicos da OSM (plano, A5). No runner, os hosts do Nominatim e
-# dos tiles passam a apontar para lugar nenhum: qualquer chamada falha na hora e derruba o teste
-# que a fez. Nos contêineres, o mesmo bloqueio está no compose.ci.yaml (extra_hosts).
+# O CI nunca chama os serviços públicos da OSM (plano, A5) nem o OpenFreeMap, de onde vêm os
+# tiles do mapa base vetorial (#107, ADR-016). No runner, esses hosts passam a apontar para lugar
+# nenhum: qualquer chamada falha na hora. No mapa, sem os tiles, fica só o fundo areia do estilo.
+# Nos contêineres, o mesmo bloqueio está no compose.ci.yaml (extra_hosts).
 set -euo pipefail
 
 hosts=(
@@ -10,6 +11,7 @@ hosts=(
   a.tile.openstreetmap.org
   b.tile.openstreetmap.org
   c.tile.openstreetmap.org
+  tiles.openfreemap.org
 )
 
 for host in "${hosts[@]}"; do
@@ -25,4 +27,4 @@ for host in "${hosts[@]}"; do
   done
 done
 
-echo "Serviços públicos da OSM bloqueados: ${hosts[*]}"
+echo "Serviços públicos bloqueados: ${hosts[*]}"

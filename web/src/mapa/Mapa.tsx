@@ -1,6 +1,6 @@
-// Mapa Interativo (DAS 7.2): MapLibre com os tiles raster do OpenStreetMap, só os da tela
-// atual, com atribuição (ADR-013), nas cores do mapa (tinta.ts), preso à região atendida, sempre em
-// 2D com o norte para cima. Por cima: as áreas proibidas, as duas rotas e o editor de áreas.
+// Mapa Interativo (DAS 7.2): MapLibre com o mapa base vetorial (estilo.ts, ADR-016), com
+// atribuição, nas cores do mapa (tinta.ts), preso à região atendida, sempre em 2D com o norte
+// para cima. Por cima: as áreas proibidas, as duas rotas e o editor de áreas.
 // No diagnóstico (telas 11 e 12), a área apontada ganha o nome e um contorno mais forte.
 // Movimento (vault, Contorno-Animacoes): a restrita tem um brilho que pulsa (M1); a rota chega
 // sendo desenhada de A a B (M3), com a câmera deslizando (M4); áreas entram e saem com fade (M5,
@@ -13,7 +13,6 @@ import {
   setWorkerUrl,
   type ExpressionSpecification,
   type GeoJSONSource,
-  type MapOptions,
 } from 'maplibre-gl'
 import enderecoDoWorker from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url'
 import { useEffect, useImperativeHandle, useRef, type Ref } from 'react'
@@ -31,8 +30,8 @@ import {
   type EstadoDoDesenho,
   type RecusaDoDesenho,
 } from '../restricoes/editor'
+import { ATRIBUICAO_OSM, estilo } from './estilo'
 import { REGIAO } from './regiao'
-import { registrarTinta, tingido } from './tilesTingidos'
 
 // A região atendida, com folga para o mapa não cortar a borda.
 const FOLGA = 0.05
@@ -42,29 +41,9 @@ const LIMITES: [Coordenadas, Coordenadas] = [
 ]
 
 // O MapLibre 6 monta o endereço do worker em tempo de execução, e o Vite não leva o arquivo para
-// o build: sem isto, o worker dá 404 e as fontes GeoJSON (rotas e áreas) não aparecem. Os tiles e
-// os marcadores não dependem dele, por isso o mapa parecia normal (ponta a ponta, 2026-10-31).
+// o build: sem isto, o worker dá 404 e as fontes GeoJSON (rotas e áreas) não aparecem (ponta a
+// ponta, 2026-10-31). Com o mapa vetorial (#107), os tiles do mapa base também passam por ele.
 setWorkerUrl(enderecoDoWorker)
-
-// Configurável para os testes ponta a ponta usarem o tile em branco (plano, A5).
-const TILES =
-  (import.meta.env.VITE_TILES_URL as string | undefined) ??
-  'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
-
-const ESTILO: NonNullable<MapOptions['style']> = {
-  version: 8,
-  sources: {
-    osm: {
-      type: 'raster',
-      tiles: [tingido(TILES)],
-      tileSize: 256,
-      maxzoom: 19,
-      attribution:
-        '<a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">© OpenStreetMap contributors</a>',
-    },
-  },
-  layers: [{ id: 'osm', type: 'raster', source: 'osm' }],
-}
 
 const VAZIO = { type: 'FeatureCollection' as const, features: [] }
 
@@ -271,13 +250,12 @@ export function Mapa({ ref, ...props }: Props) {
   useEffect(() => {
     const container = elemento.current
     if (!container) return
-    registrarTinta()
     const novo = new MapLibreMap({
       container,
-      style: ESTILO,
+      style: estilo(),
       bounds: REGIAO,
       maxBounds: LIMITES,
-      attributionControl: { compact: false },
+      attributionControl: { compact: false, customAttribution: ATRIBUICAO_OSM },
       dragRotate: false,
       pitchWithRotate: false,
       touchPitch: false,
