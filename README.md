@@ -4,13 +4,36 @@ Planejador de rotas web em que o usuário declara por onde **não** quer passar,
 
 Recorte do MVP: São Leopoldo e Novo Hamburgo (RS), sobre dados abertos do OpenStreetMap.
 
-> **Estado:** Sprint 5 em andamento. Já dá para marcar origem e destino (buscando o endereço ou tocando no mapa), ver a rota normal, desenhar áreas proibidas, escolher quanto evitar cada classe de via e ver a rota que obedece, com o custo da escolha. Áreas proibidas podem ser desenhadas ou criadas como um raio em volta de um endereço. Quando nenhum caminho respeita as áreas, o Contorno aponta quais delas bloqueiam o trajeto.
+> **Estado:** MVP concluído na Sprint 6, versão [`v1.0.0`](https://github.com/frsrodrigobocayuva/Contorno/releases/tag/v1.0.0). O acompanhamento do projeto (quadro, sprints, wiki com a arquitetura e os ADRs) está no Azure DevOps.
+
+## Funcionalidades
+
+Das 8 funcionalidades planejadas no Grau A, 7 foram entregues e 1 foi cortada do MVP. Entraram também 3 além do plano. No total, são 10 entregues.
+
+| # | Funcionalidade | Caso de uso |
+|---|---|---|
+| 1 | Origem e destino por busca de endereço ou toque no mapa (pontos fora da região são recusados) | UC01, UC06 |
+| 2 | Rota normal (irrestrita) como linha de base, com tempo e distância | UC01 |
+| 3 | Área proibida desenhada no mapa, com o contorno das células que o sistema aplica | UC02 |
+| 4 | Área por raio a partir de um endereço, de 100 m a 2 km | UC02, UC06 |
+| 5 | Preferências por classe de via: indiferente, evitar ou evitar fortemente | UC03 |
+| 6 | Rota que obedece, sobreposta à normal, com o custo "+X min · +Y km" | UC01 |
+| 7 | Diagnóstico: quando não há caminho, aponta as áreas que bloqueiam o trajeto | UC05 |
+| + | Identidade visual e movimento: paleta, Atkinson Hyperlegible, brilho da rota e transições | — |
+| + | Usabilidade do desenho e da rota: Desfazer área, confirmação ao cancelar, Esc em dois níveis, painéis com rolagem própria | — |
+| + | Mapa base vetorial, nítido em qualquer zoom | — |
+
+**Fora do MVP:**
+- os perfis de restrição (funcionalidade 8, UC04: salvar, reaplicar, editar e excluir);
+- desativar a área apontada pelo diagnóstico só para aquela consulta;
+- o deploy público, adiado.
 
 ## Pilha
 
 | Parte | Tecnologia |
 |---|---|
 | Cliente | React + TypeScript, Vite |
+| Mapa | MapLibre GL JS; mapa base vetorial do OpenFreeMap, com estilo próprio (ADR-016) |
 | Servidor | Python 3.13, FastAPI |
 | Motor de rotas | GraphHopper 11.1 (CH para a rota irrestrita; LM para a restrita) |
 | Dados | Extrato OpenStreetMap da Geofabrik, recortado com osmium |
@@ -120,7 +143,7 @@ python motor/recortar_extrato.py --data AAMMDD
 docker compose down && docker volume rm contorno_graph-cache
 ```
 
-Os dados são © OpenStreetMap contributors, sob a licença ODbL.
+Os dados são © OpenStreetMap contributors, sob a licença ODbL. O mapa base vem do OpenFreeMap (© OpenMapTiles), feito com os mesmos dados.
 
 ## Estrutura
 
